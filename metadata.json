@@ -1,0 +1,7 @@
+{
+  "name": "Money Buddy - Geo Safe",
+  "description": "A secure financial dashboard featuring Plaid integration, geofenced transactions, and AI-powered location validation using Google Maps grounding.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
