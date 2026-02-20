@@ -57,7 +57,7 @@ const Auth: React.FC = () => {
           <h2 className="text-3xl font-extrabold text-white tracking-tight">
             Money Buddy
           </h2>
-          <p className="mt-2 text-indigo-300 text-sm font-medium uppercase tracking-widest">
+          <p className="mt-2 text-sm font-semibold uppercase tracking-widest" style={{ color: '#a3e635' }}>
             Geo-Safe
           </p>
         </div>
@@ -125,7 +125,8 @@ const Auth: React.FC = () => {
         </div>
       </div>
       
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-indigo-500/5 blur-[100px] pointer-events-none"></div>
+      <div className="absolute top-1/3 left-1/3 w-[500px] h-[500px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)', filter: 'blur(80px)' }}></div>
+      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(163,230,53,0.06) 0%, transparent 70%)', filter: 'blur(80px)' }}></div>
     </div>
   );
 };
