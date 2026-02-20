@@ -1,7 +1,7 @@
-
 import React, { useState } from 'react';
 import { Transaction } from '../types';
 import { supabase } from '../supabaseClient';
+import { callEdgeFunction } from '../lib/api';
 
 interface SecureEscrowProps {
   inboundTransfers: Transaction[];
@@ -28,7 +28,6 @@ const SecureEscrow: React.FC<SecureEscrowProps> = ({ inboundTransfers, onClaim }
     setCheckingLocation(transfer.id);
     
     const now = new Date();
-    // Fix: Using correct property name expires_at from Transaction interface
     if (transfer.expires_at) {
       const expiry = new Date(transfer.expires_at);
       if (now > expiry) {
@@ -38,14 +37,18 @@ const SecureEscrow: React.FC<SecureEscrowProps> = ({ inboundTransfers, onClaim }
       }
     }
 
-    // Fix: Using correct property name geofence_points from Transaction interface
-    if (!transfer.geofence_points || transfer.geofence_points.length === 0) {
-      onClaim(transfer.id);
-      setCheckingLocation(null);
+    // If no geofence and no time lock, release via server
+    const hasGeofence = (transfer.geofence_points && transfer.geofence_points.length > 0) || 
+                        (transfer.geo_fence_lat != null && transfer.geo_fence_lng != null);
+    const hasTimeLock = !!transfer.time_lock_until;
+
+    if (!hasGeofence && !hasTimeLock) {
+      // No conditions -- call server-side release directly
+      releaseEscrowOnServer(transfer.id, null, null);
       return;
     }
 
-    // PRODUCTION HARDENING: No caching, high accuracy required
+    // Need location for geo-fenced transfers
     const geoOptions = {
       enableHighAccuracy: true,
       maximumAge: 0, 
@@ -54,39 +57,27 @@ const SecureEscrow: React.FC<SecureEscrowProps> = ({ inboundTransfers, onClaim }
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const userPoint: [number, number] = [position.coords.latitude, position.coords.longitude];
+        const userLat = position.coords.latitude;
+        const userLng = position.coords.longitude;
+        const userPoint: [number, number] = [userLat, userLng];
         
-        // 1. Client-side pre-verification
-        // Fix: Using correct property name geofence_points from Transaction interface
-        const isSecure = isInsideGeofence(userPoint, transfer.geofence_points!);
-
-        if (isSecure) {
-          /* 
-            PROD NOTE: In a live environment, we call a Supabase Edge Function here:
-            const { data, error } = await supabase.functions.invoke('verify-spatial-claim', {
-              body: { txId: transfer.id, lat: userPoint[0], lng: userPoint[1] }
+        // Client-side pre-verification for polygon geofence
+        if (transfer.geofence_points && transfer.geofence_points.length > 0) {
+          const isSecure = isInsideGeofence(userPoint, transfer.geofence_points);
+          if (!isSecure) {
+            await supabase.from('audit_log').insert({
+              event_type: 'SPATIAL_VERIFICATION_FAILURE',
+              transaction_id: transfer.id,
+              metadata: { attempted_coords: userPoint }
             });
-          */
-          
-          // Log spatial success in audit trail
-          await supabase.from('audit_log').insert({
-            event_type: 'SPATIAL_VERIFICATION_SUCCESS',
-            transaction_id: transfer.id,
-            metadata: { coords: userPoint }
-          });
-
-          alert(`Spatial Identity Confirmed at [${userPoint[0].toFixed(4)}, ${userPoint[1].toFixed(4)}]. Access Granted.`);
-          onClaim(transfer.id);
-        } else {
-          // Log spatial violation attempt
-          await supabase.from('audit_log').insert({
-            event_type: 'SPATIAL_VERIFICATION_FAILURE',
-            transaction_id: transfer.id,
-            metadata: { attempted_coords: userPoint }
-          });
-          alert(`Spatial Violation: Hardware reported coordinates outside the secure perimeter.`);
+            alert('Spatial Violation: Hardware reported coordinates outside the secure perimeter.');
+            setCheckingLocation(null);
+            return;
+          }
         }
-        setCheckingLocation(null);
+
+        // Server-side release (handles geo-fence radius check, time-lock, and Stripe transfer)
+        await releaseEscrowOnServer(transfer.id, userLat, userLng);
       },
       (error) => {
         alert(`Hardware Signal Error: ${error.message}. Spatial verification requires active GPS hardware.`);
@@ -94,6 +85,36 @@ const SecureEscrow: React.FC<SecureEscrowProps> = ({ inboundTransfers, onClaim }
       },
       geoOptions
     );
+  };
+
+  const releaseEscrowOnServer = async (txId: string, lat: number | null, lng: number | null) => {
+    try {
+      const result = await callEdgeFunction<{
+        success: boolean;
+        transfer_id: string;
+        amount_transferred: number;
+        platform_fee: number;
+        error?: string;
+      }>('release-escrow', {
+        transaction_id: txId,
+        current_lat: lat,
+        current_lng: lng,
+      });
+
+      if (result.success) {
+        alert(
+          `Escrow Released. $${result.amount_transferred.toFixed(2)} transferred to your account.\n` +
+          `Platform Fee: $${result.platform_fee.toFixed(2)} | Transfer ID: ${result.transfer_id}`
+        );
+        onClaim(txId);
+      } else {
+        alert(`Release Denied: ${result.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      alert(`Escrow Release Error: ${(err as Error).message}`);
+    } finally {
+      setCheckingLocation(null);
+    }
   };
 
   if (inboundTransfers.length === 0) return null;
@@ -109,7 +130,6 @@ const SecureEscrow: React.FC<SecureEscrowProps> = ({ inboundTransfers, onClaim }
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {inboundTransfers.map(transfer => {
-          // Fix: Using correct property name expires_at from Transaction interface
           const isExpired = transfer.expires_at && new Date() > new Date(transfer.expires_at);
           return (
             <div key={transfer.id} className={`p-6 glass-dark border rounded-3xl relative overflow-hidden group transition-all ${isExpired ? 'border-red-500/30 opacity-60' : 'border-indigo-500/30 hover:border-lime-400/40 shadow-xl'}`}>
@@ -119,6 +139,9 @@ const SecureEscrow: React.FC<SecureEscrowProps> = ({ inboundTransfers, onClaim }
                     {isExpired ? 'Link Severed' : 'Locked Asset'}
                   </p>
                   <h4 className="text-2xl font-black font-mono text-white">${transfer.amount.toLocaleString()}</h4>
+                  {transfer.net_amount && (
+                    <p className="text-[9px] text-gray-500 font-bold mt-1">Net: ${transfer.net_amount.toLocaleString()} (2% fee)</p>
+                  )}
                 </div>
                 <div className="text-right">
                   <span className="text-[9px] text-gray-500 font-bold uppercase tracking-tighter block">Origin Terminal</span>
@@ -130,10 +153,9 @@ const SecureEscrow: React.FC<SecureEscrowProps> = ({ inboundTransfers, onClaim }
                 <div className="flex justify-between items-center text-[9px] uppercase font-black tracking-[0.2em]">
                   <span className="text-gray-500">Security:</span>
                   <div className="flex space-x-2">
-                    {/* Fix: Using correct property name geofence_points and expires_at */}
-                    {transfer.geofence_points && <span className="text-lime-400">SPATIAL_LOCK</span>}
-                    {transfer.expires_at && <span className="text-orange-400">TIME_LOCK</span>}
-                    {!transfer.geofence_points && !transfer.expires_at && <span className="text-indigo-400">SIG_PIN</span>}
+                    {(transfer.geofence_points || transfer.geo_fence_lat != null) && <span className="text-lime-400">SPATIAL_LOCK</span>}
+                    {(transfer.expires_at || transfer.time_lock_until) && <span className="text-orange-400">TIME_LOCK</span>}
+                    {!transfer.geofence_points && transfer.geo_fence_lat == null && !transfer.expires_at && !transfer.time_lock_until && <span className="text-indigo-400">SIG_PIN</span>}
                   </div>
                 </div>
                 
@@ -143,7 +165,7 @@ const SecureEscrow: React.FC<SecureEscrowProps> = ({ inboundTransfers, onClaim }
 
                 <button 
                   onClick={() => handleClaimAttempt(transfer)}
-                  disabled={checkingLocation === transfer.id || isExpired}
+                  disabled={checkingLocation === transfer.id || !!isExpired}
                   className={`w-full py-4 border rounded-2xl text-[10px] font-black transition-all uppercase tracking-[0.3em] flex items-center justify-center space-x-3 ${
                     isExpired 
                     ? 'bg-red-500/10 border-red-500/20 text-red-400 cursor-not-allowed opacity-50' 

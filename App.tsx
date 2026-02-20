@@ -53,7 +53,7 @@ const App: React.FC = () => {
     // 3. Filter Inbound Locked Transfers for Escrow
     const inbound = txData?.filter(tx => 
       tx.recipient_email.toLowerCase() === session.user.email.toLowerCase() && 
-      tx.status === 'locked'
+      (tx.status === 'locked' || tx.status === 'pending_escrow')
     ) || [];
 
     // 4. Admin Specific Logic (Lucas)
@@ -102,13 +102,10 @@ const App: React.FC = () => {
     await fetchData();
   };
 
-  const handleClaimFunds = async (txId: string) => {
-    const { error } = await supabase
-      .from('transactions')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', txId);
-    
-    if (!error) await fetchData();
+  const handleClaimFunds = async (_txId: string) => {
+    // Escrow release is now handled server-side by the release-escrow Edge Function
+    // This callback just refreshes the data after a successful claim
+    await fetchData();
   };
 
   const handleLogout = async () => {
