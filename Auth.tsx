@@ -44,15 +44,14 @@ const Auth: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="max-w-md w-full glass p-8 pt-20 rounded-3xl space-y-8 shadow-2xl relative border border-white/10 mt-16">
-        <div className="text-center flex flex-col items-center">
-          <div className="relative -mt-24 mb-2">
-             <div className="absolute -inset-4 opacity-50 animate-pulse pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(163,230,53,0.3) 0%, rgba(139,92,246,0.15) 40%, transparent 70%)', filter: 'blur(20px)' }}></div>
+      <div className="max-w-md w-full glass p-8 rounded-3xl space-y-8 shadow-2xl relative border border-white/10">
+        <div className="text-center flex flex-col items-center gap-1">
+          <div className="w-24 h-24 relative mb-2">
+             <div className="absolute inset-0 bg-lime-400/20 blur-2xl rounded-full animate-pulse"></div>
              <img 
-               src="logo-hero.jpg" 
+               src="logo.png" 
                alt="Money Buddy Mascot" 
-               className="w-40 h-40 object-contain relative z-10 drop-shadow-2xl transform hover:scale-110 hover:-translate-y-1 transition-all duration-500"
-               style={{ filter: 'drop-shadow(0 8px 24px rgba(163,230,53,0.2))' }}
+               className="w-full h-full object-contain relative z-10 transform hover:scale-110 transition-transform duration-500"
              />
           </div>
           <h2 className="text-3xl font-extrabold text-white tracking-tight leading-none">
