@@ -45,23 +45,37 @@ END $$;
 -- 6. RLS for profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "users_read_own_profile" ON public.profiles
-    FOR SELECT USING (auth.uid() = id);
+DO $$ BEGIN
+    CREATE POLICY "users_read_own_profile" ON public.profiles
+        FOR SELECT USING (auth.uid() = id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE POLICY IF NOT EXISTS "users_update_own_profile" ON public.profiles
-    FOR UPDATE USING (auth.uid() = id);
+DO $$ BEGIN
+    CREATE POLICY "users_update_own_profile" ON public.profiles
+        FOR UPDATE USING (auth.uid() = id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE POLICY IF NOT EXISTS "users_insert_own_profile" ON public.profiles
-    FOR INSERT WITH CHECK (auth.uid() = id);
+DO $$ BEGIN
+    CREATE POLICY "users_insert_own_profile" ON public.profiles
+        FOR INSERT WITH CHECK (auth.uid() = id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 7. Update transaction policy so recipient can also see transactions sent to them
--- (The existing policy uses recipient_email; add recipient_id based access)
-CREATE POLICY IF NOT EXISTS "recipient_id_transactions" ON public.transactions
-    FOR SELECT USING (auth.uid() = recipient_id);
+DO $$ BEGIN
+    CREATE POLICY "recipient_id_transactions" ON public.transactions
+        FOR SELECT USING (auth.uid() = recipient_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 8. Allow transaction status updates by sender or recipient
-CREATE POLICY IF NOT EXISTS "user_update_transactions" ON public.transactions
-    FOR UPDATE USING (auth.uid() = sender_id OR auth.uid() = recipient_id);
+DO $$ BEGIN
+    CREATE POLICY "user_update_transactions" ON public.transactions
+        FOR UPDATE USING (auth.uid() = sender_id OR auth.uid() = recipient_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 9. Auto-create profile on signup trigger
 CREATE OR REPLACE FUNCTION public.handle_new_user()
