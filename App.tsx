@@ -15,6 +15,8 @@ import { BankAccount, Transaction } from './types';
 
 type View = 'dashboard' | 'settings' | 'setup' | 'admin' | 'history';
 
+const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || '').toLowerCase();
+
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -51,11 +53,11 @@ const App: React.FC = () => {
     // 3. Filter Inbound Locked Transfers for Escrow
     const inbound = txData?.filter(tx => 
       tx.recipient_email.toLowerCase() === session.user.email.toLowerCase() && 
-      tx.status === 'locked'
+      (tx.status === 'locked' || tx.status === 'pending_escrow')
     ) || [];
 
     // 4. Admin Specific Logic (Lucas)
-    if (session.user.email === 'lucasnale305@gmail.com') {
+    if (session.user.email.toLowerCase() === ADMIN_EMAIL) {
       const { data: metrics } = await supabase.rpc('get_platform_revenue'); // Requires RPC or simple sum query
       // For simplicity in this build, we use the view or a sum query:
       const { data: allTx } = await supabase.from('transactions').select('amount');
@@ -70,13 +72,6 @@ const App: React.FC = () => {
   }, [session]);
 
   useEffect(() => {
-    // Initial Config Load
-    const savedConfig = localStorage.getItem('moneybuddy_config');
-    if (savedConfig) {
-      const config = JSON.parse(savedConfig);
-      if (config.theme) setTheme(config.theme);
-    }
-
     // Auth Listeners
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -85,10 +80,6 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
-
-    // Lucas Direct Access Check
-    const mockSession = localStorage.getItem('eden_clearance_token');
-    if (mockSession) setSession(JSON.parse(mockSession));
 
     // Setup Wizard Check
     const setupStatus = localStorage.getItem('moneybuddy_setup_complete');
@@ -111,18 +102,14 @@ const App: React.FC = () => {
     await fetchData();
   };
 
-  const handleClaimFunds = async (txId: string) => {
-    const { error } = await supabase
-      .from('transactions')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', txId);
-    
-    if (!error) await fetchData();
+  const handleClaimFunds = async (_txId: string) => {
+    // Escrow release is now handled server-side by the release-escrow Edge Function
+    // This callback just refreshes the data after a successful claim
+    await fetchData();
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    localStorage.removeItem('eden_clearance_token');
     setSession(null);
     setCurrentView('dashboard');
   };
@@ -136,17 +123,7 @@ const App: React.FC = () => {
   if (!session) {
     return (
       <div style={cssVars} className="min-h-screen bg-[var(--secondary-bg)] bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] overflow-hidden">
-        <Auth 
-          onDemoLogin={() => {
-            const mock = { user: { id: '000-demo', email: 'global.user@secure.net' }, access_token: 'demo' };
-            setSession(mock);
-          }} 
-          onAdminLogin={(email) => {
-            const mock = { user: { id: 'lucas-admin', email }, access_token: 'admin', isAdmin: true };
-            localStorage.setItem('eden_clearance_token', JSON.stringify(mock));
-            setSession(mock);
-          }} 
-        />
+        <Auth />
       </div>
     );
   }
@@ -158,7 +135,7 @@ const App: React.FC = () => {
           onConnect={() => alert('Launching Plaid Production Interface...')} 
           onLogout={handleLogout} 
           userEmail={session.user.email} 
-          isAdmin={session.user.email === 'lucasnale305@gmail.com'}
+          isAdmin={session.user.email.toLowerCase() === ADMIN_EMAIL}
           currentView={currentView}
           setView={setCurrentView}
         />
@@ -173,7 +150,7 @@ const App: React.FC = () => {
           )}
 
           {currentView === 'settings' && (
-            <Settings userEmail={session.user.email} isAdmin={session.user.email === 'lucasnale305@gmail.com'} />
+            <Settings userEmail={session.user.email} isAdmin={session.user.email.toLowerCase() === ADMIN_EMAIL} />
           )}
 
           {currentView === 'history' && (
@@ -187,7 +164,7 @@ const App: React.FC = () => {
           {currentView === 'dashboard' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in zoom-in duration-500">
               <div className="lg:col-span-8 space-y-8">
-                {session.user.email === 'lucasnale305@gmail.com' && (
+                {session.user.email.toLowerCase() === ADMIN_EMAIL && (
                   <div className="p-4 bg-lime-400/10 border border-lime-400/30 rounded-2xl flex justify-between items-center">
                     <span className="text-xs font-black text-lime-400 uppercase tracking-widest">Global Platform Yield (2%)</span>
                     <span className="text-xl font-mono text-white font-black">${platformRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>

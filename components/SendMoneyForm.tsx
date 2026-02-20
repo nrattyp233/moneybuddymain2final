@@ -1,6 +1,7 @@
-
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { callEdgeFunction } from '../lib/api';
+import { stripePromise } from '../lib/stripe';
 import MapSelector from './MapSelector';
 
 interface SendMoneyFormProps {
@@ -23,10 +24,6 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
     if (isNaN(val) || val <= 0) return;
 
     setIsLoading(true);
-    
-    // Check Stripe Config
-    const config = JSON.parse(localStorage.getItem('moneybuddy_config') || '{}');
-    const isStripeConfigured = config.stripePublicKey && config.stripeSecretKey;
 
     const { data: { session } } = await supabase.auth.getSession();
     
@@ -36,40 +33,71 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
       return;
     }
 
-    // 1. Initializing Stripe Mock for Production UI Flow
-    let stripePiId = null;
-    if (isStripeConfigured) {
-      // Simulate calling Edge Function to create Payment Intent
-      stripePiId = `pi_${Math.random().toString(36).substring(2, 15)}`;
-    }
+    try {
+      // Calculate geo-fence center from polygon points (centroid)
+      let geoFenceLat: number | null = null;
+      let geoFenceLng: number | null = null;
+      let geoFenceRadius: number | null = null;
 
-    const expiryDate = useExpiry 
-      ? new Date(Date.now() + parseInt(expiryHours) * 60 * 60 * 1000).toISOString()
-      : null;
+      if (useGeofence && points && points.length > 0) {
+        geoFenceLat = points.reduce((sum, p) => sum + p[0], 0) / points.length;
+        geoFenceLng = points.reduce((sum, p) => sum + p[1], 0) / points.length;
+        // Approximate radius as max distance from centroid to any point (in meters)
+        const toRad = (d: number) => (d * Math.PI) / 180;
+        geoFenceRadius = Math.max(...points.map(p => {
+          const R = 6371e3;
+          const dLat = toRad(p[0] - geoFenceLat!);
+          const dLng = toRad(p[1] - geoFenceLng!);
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(geoFenceLat!)) * Math.cos(toRad(p[0])) * Math.sin(dLng / 2) ** 2;
+          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }));
+      }
 
-    // 2. Commit to Sovereign Ledger
-    const { error } = await supabase.from('transactions').insert({
-      sender_id: session.user.id,
-      recipient_email: email,
-      amount: val,
-      description: description || 'Secure Asset Transfer',
-      status: 'locked',
-      geofence_points: points,
-      expires_at: expiryDate,
-      stripe_payment_intent_id: stripePiId,
-    });
+      const timeLockUntil = useExpiry
+        ? new Date(Date.now() + parseInt(expiryHours) * 60 * 60 * 1000).toISOString()
+        : null;
 
-    if (error) {
-      alert(`Transfer Refused: ${error.message}`);
-    } else {
-      const stripeMsg = isStripeConfigured 
-        ? `Stripe Intent [${stripePiId}] Initialized.` 
-        : "Warning: Stripe Settlement Node Offline. Transfer in Simulation Mode.";
-      
-      const expiryMsg = useExpiry ? ` Assets self-recall in ${expiryHours}H.` : " No time-lock.";
-      
-      alert(`Asset Deployment Successful. $${val} locked for ${email}. ${stripeMsg}${expiryMsg}`);
-      
+      // 1. Create PaymentIntent via Edge Function
+      const paymentResult = await callEdgeFunction<{
+        client_secret: string;
+        transaction_id: string;
+        payment_intent_id: string;
+        platform_fee: number;
+        net_amount: number;
+      }>('create-payment-intent', {
+        amount: val,
+        recipient_email: email,
+        description: description || 'Secure Asset Transfer',
+        geo_fence_lat: geoFenceLat,
+        geo_fence_lng: geoFenceLng,
+        geo_fence_radius: geoFenceRadius,
+        time_lock_until: timeLockUntil,
+        geofence_points: points,
+      });
+
+      // 2. Confirm payment with Stripe.js
+      const stripe = await stripePromise;
+      if (!stripe) {
+        throw new Error('Stripe not loaded. Check VITE_STRIPE_PUBLISHABLE_KEY.');
+      }
+
+      const { error: stripeError } = await stripe.confirmCardPayment(paymentResult.client_secret, {
+        payment_method: {
+          card: { token: 'tok_visa' }, // In production, use Stripe Elements for real card input
+        } as any,
+      });
+
+      if (stripeError) {
+        throw new Error(stripeError.message || 'Payment failed');
+      }
+
+      const feeDisplay = `2% Fee: $${paymentResult.platform_fee.toFixed(2)}`;
+      const netDisplay = `Net to Recipient: $${paymentResult.net_amount.toFixed(2)}`;
+      const expiryMsg = useExpiry ? ` Time-lock: ${expiryHours}H.` : '';
+      const geoMsg = useGeofence ? ' Geo-fence active.' : '';
+
+      alert(`Payment Confirmed. $${val} secured for ${email}.\n${feeDisplay} | ${netDisplay}${expiryMsg}${geoMsg}`);
+
       setAmount('');
       setEmail('');
       setDescription('');
@@ -78,7 +106,10 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
       setUseExpiry(false);
       setExpiryHours('24');
       onTransactionInitiated?.();
+    } catch (err) {
+      alert(`Transfer Error: ${(err as Error).message}`);
     }
+
     setIsLoading(false);
   };
 
@@ -180,7 +211,7 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
           {isLoading ? (
              <div className="flex items-center justify-center space-x-2">
                <div className="w-3 h-3 border-2 border-indigo-900 border-t-transparent rounded-full animate-spin"></div>
-               <span>CALIBRATING...</span>
+               <span>PROCESSING...</span>
              </div>
           ) : 'DEPLOY CREDITS'}
         </button>

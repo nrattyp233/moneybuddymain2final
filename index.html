@@ -11,7 +11,9 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0f0c29;
+            background: linear-gradient(135deg, #0f0c29 0%, #1a0a2e 25%, #0d1a2d 50%, #0a1f1a 75%, #0f0c29 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
             color: #ffffff;
         }
         .glass {
@@ -40,19 +42,7 @@
         }
         #map { height: 200px; border-radius: 1rem; margin-top: 0.5rem; }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.4",
-    "react-dom": "https://esm.sh/react-dom@^19.2.4",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
-    "leaflet": "https://esm.sh/leaflet@1.9.4"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
+
 </head>
 <body>
     <div id="root"></div>
