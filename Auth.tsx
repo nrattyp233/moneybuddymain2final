@@ -2,11 +2,7 @@
 import React, { useState } from 'react';
 import { supabase } from './supabaseClient';
 
-interface AuthProps {
-  onDemoLogin: () => void;
-}
-
-const Auth: React.FC<AuthProps> = ({ onDemoLogin }) => {
+const Auth: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,24 +21,24 @@ const Auth: React.FC<AuthProps> = ({ onDemoLogin }) => {
     if (error) {
       setMessage({ type: 'error', text: error.message });
       if (error.message.includes('Invalid URL') || error.message.includes('fetch')) {
-        setMessage({ type: 'error', text: 'Supabase connection failed. Use Clearance Override for access.' });
+        setMessage({ type: 'error', text: 'Connection failed. Please try again later.' });
       }
     } else if (isSignUp) {
-      setMessage({ type: 'success', text: 'Confirmation link dispatched to your terminal.' });
+      setMessage({ type: 'success', text: 'Confirmation link sent to your email.' });
     }
     setLoading(false);
   };
 
   const handlePasswordReset = async () => {
     if (!email) {
-      setMessage({ type: 'error', text: 'Specify target email for reset.' });
+      setMessage({ type: 'error', text: 'Please enter your email address first.' });
       return;
     }
     const { error } = await supabase.auth.resetPasswordForEmail(email);
     if (error) {
       setMessage({ type: 'error', text: error.message });
     } else {
-      setMessage({ type: 'success', text: 'Reset sequence initiated. Check email.' });
+      setMessage({ type: 'success', text: 'Password reset link sent. Check your email.' });
     }
   };
 
@@ -69,7 +65,7 @@ const Auth: React.FC<AuthProps> = ({ onDemoLogin }) => {
         <form className="mt-8 space-y-6" onSubmit={handleAuth}>
           <div className="space-y-4">
             <div>
-              <label className="text-[10px] font-bold text-indigo-200 uppercase tracking-[0.2em] mb-2 block ml-1">Terminal ID</label>
+              <label className="text-[10px] font-bold text-indigo-200 uppercase tracking-[0.2em] mb-2 block ml-1">Email</label>
               <input
                 type="email"
                 required
@@ -80,7 +76,7 @@ const Auth: React.FC<AuthProps> = ({ onDemoLogin }) => {
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-indigo-200 uppercase tracking-[0.2em] mb-2 block ml-1">Access Cipher</label>
+              <label className="text-[10px] font-bold text-indigo-200 uppercase tracking-[0.2em] mb-2 block ml-1">Password</label>
               <input
                 type="password"
                 required
@@ -104,21 +100,7 @@ const Auth: React.FC<AuthProps> = ({ onDemoLogin }) => {
               disabled={loading}
               className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg active:scale-[0.98] disabled:opacity-50 border border-indigo-400/30"
             >
-              {loading ? 'Decrypting...' : (isSignUp ? 'INITIALIZE' : 'AUTHENTICATE')}
-            </button>
-
-            <div className="relative flex items-center py-2">
-              <div className="flex-grow border-t border-white/5"></div>
-              <span className="flex-shrink mx-4 text-[10px] text-gray-500 font-bold uppercase tracking-widest">or</span>
-              <div className="flex-grow border-t border-white/5"></div>
-            </div>
-
-            <button
-              type="button"
-              onClick={onDemoLogin}
-              className="w-full py-4 bg-[#bef264] hover:bg-[#a3e635] text-indigo-900 font-black rounded-xl transition-all shadow-xl shadow-lime-400/20 active:scale-[0.98] uppercase tracking-wider text-sm border-2 border-lime-400/50"
-            >
-              Clearance Override (Demo Access)
+              {loading ? 'Signing in...' : (isSignUp ? 'SIGN UP' : 'LOG IN')}
             </button>
 
             {!isSignUp && (
@@ -127,7 +109,7 @@ const Auth: React.FC<AuthProps> = ({ onDemoLogin }) => {
                 onClick={handlePasswordReset}
                 className="w-full text-[10px] text-indigo-400 hover:text-white transition-colors uppercase font-bold tracking-widest"
               >
-                Reset Forgotten Cipher
+                Forgot Password?
               </button>
             )}
           </div>
@@ -138,7 +120,7 @@ const Auth: React.FC<AuthProps> = ({ onDemoLogin }) => {
             onClick={() => setIsSignUp(!isSignUp)}
             className="text-indigo-200 hover:text-lime-400 transition-colors text-xs font-bold uppercase tracking-widest"
           >
-            {isSignUp ? 'Existing Personnel? Log In' : "New Personnel? Register"}
+            {isSignUp ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
           </button>
         </div>
       </div>

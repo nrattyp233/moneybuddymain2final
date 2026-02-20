@@ -123,12 +123,7 @@ const App: React.FC = () => {
   if (!session) {
     return (
       <div style={cssVars} className="min-h-screen bg-[var(--secondary-bg)] bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] overflow-hidden">
-        <Auth 
-          onDemoLogin={() => {
-            const mock = { user: { id: '000-demo', email: 'global.user@secure.net' }, access_token: 'demo' };
-            setSession(mock);
-          }} 
-        />
+        <Auth />
       </div>
     );
   }
