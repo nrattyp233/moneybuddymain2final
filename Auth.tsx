@@ -44,22 +44,21 @@ const Auth: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="max-w-md w-full glass p-8 rounded-3xl space-y-8 shadow-2xl relative border border-white/10">
-        <div className="text-center flex flex-col items-center gap-1">
-          <div className="w-32 h-32 relative mb-1">
-             <div className="absolute -inset-3 rounded-full opacity-60 animate-pulse" style={{ background: 'radial-gradient(circle, rgba(163,230,53,0.25) 0%, rgba(139,92,246,0.15) 50%, transparent 70%)' }}></div>
-             <div className="w-full h-full rounded-full overflow-hidden relative z-10 border-2 border-white/10 shadow-lg shadow-lime-400/10">
-               <img 
-                 src="logo.png" 
-                 alt="Money Buddy Mascot" 
-                 className="w-full h-full object-cover scale-110 transform hover:scale-125 transition-transform duration-500"
-               />
-             </div>
+      <div className="max-w-md w-full glass p-8 pt-20 rounded-3xl space-y-8 shadow-2xl relative border border-white/10 mt-16">
+        <div className="text-center flex flex-col items-center">
+          <div className="relative -mt-24 mb-2">
+             <div className="absolute -inset-4 opacity-50 animate-pulse pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(163,230,53,0.3) 0%, rgba(139,92,246,0.15) 40%, transparent 70%)', filter: 'blur(20px)' }}></div>
+             <img 
+               src="logo-hero.jpg" 
+               alt="Money Buddy Mascot" 
+               className="w-40 h-40 object-contain relative z-10 drop-shadow-2xl transform hover:scale-110 hover:-translate-y-1 transition-all duration-500"
+               style={{ filter: 'drop-shadow(0 8px 24px rgba(163,230,53,0.2))' }}
+             />
           </div>
           <h2 className="text-3xl font-extrabold text-white tracking-tight leading-none">
             Money Buddy
           </h2>
-          <p className="text-sm font-bold uppercase tracking-[0.3em]" style={{ color: '#a3e635' }}>
+          <p className="mt-1 text-sm font-bold uppercase tracking-[0.3em]" style={{ color: '#a3e635' }}>
             Geo-Safe
           </p>
         </div>
