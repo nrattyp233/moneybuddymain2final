@@ -4,7 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 // Fix: Strictly follow Gemini API guidelines for key acquisition and model selection
 export const validateLocationSafety = async (locationName: string, userLocation?: { latitude: number, longitude: number }) => {
   // Use process.env.API_KEY string directly as per guidelines
-  const apiKey = process.env.API_KEY;
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   
   if (!apiKey) {
     return { text: "Security Analysis Offline: Gemini API Key not configured in environment.", grounding: [] };
