@@ -24,9 +24,9 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
 
     setIsLoading(true);
     
-    // Check Stripe Config
+    // Check Stripe Config (public key only — secret key is server-side)
     const config = JSON.parse(localStorage.getItem('moneybuddy_config') || '{}');
-    const isStripeConfigured = config.stripePublicKey && config.stripeSecretKey;
+    const isStripeConfigured = !!config.stripePublicKey;
 
     const { data: { session } } = await supabase.auth.getSession();
     

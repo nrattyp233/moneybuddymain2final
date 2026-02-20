@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { reinitializeSupabase } from '../supabaseClient';
+
 
 interface AdminPanelProps {
   currentTheme: { primary: string, secondary: string, accent: string };
@@ -9,12 +9,8 @@ interface AdminPanelProps {
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ currentTheme, onThemeChange }) => {
   const [config, setConfig] = useState({
-    supabaseUrl: '',
-    supabaseAnonKey: '',
     plaidClientId: '',
-    plaidSecret: '',
     stripePublicKey: '',
-    stripeSecretKey: '',
   });
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'config' | 'sql'>('config');
@@ -25,12 +21,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentTheme, onThemeChange }) 
       try {
         const parsed = JSON.parse(saved);
         setConfig({
-          supabaseUrl: parsed.supabaseUrl || '',
-          supabaseAnonKey: parsed.supabaseAnonKey || '',
           plaidClientId: parsed.plaidClientId || '',
-          plaidSecret: parsed.plaidSecret || '',
           stripePublicKey: parsed.stripePublicKey || '',
-          stripeSecretKey: parsed.stripeSecretKey || '',
         });
       } catch (e) {
         console.error("Failed to load admin config");
@@ -43,13 +35,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentTheme, onThemeChange }) 
     const fullConfig = { ...config, theme: currentTheme };
     localStorage.setItem('moneybuddy_config', JSON.stringify(fullConfig));
     
-    if (config.supabaseUrl && config.supabaseAnonKey) {
-      reinitializeSupabase(config.supabaseUrl, config.supabaseAnonKey);
-    }
-    
     setSaveStatus('FINANCIAL GATEWAYS SYNCHRONIZED');
     setTimeout(() => setSaveStatus(null), 3000);
-    window.location.reload();
   };
 
   const updateTheme = (key: string, val: string) => {
@@ -75,24 +62,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentTheme, onThemeChange }) 
       {activeTab === 'config' ? (
         <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-6">
-            <AdminSection title="Cloud Infrastructure" icon="🔌">
-              <div className="space-y-4">
-                <InputField label="Supabase Project URL" value={config.supabaseUrl} onChange={v => setConfig({...config, supabaseUrl: v})} placeholder="https://xyz.supabase.co" />
-                <InputField label="Supabase Anon Key" value={config.supabaseAnonKey} onChange={v => setConfig({...config, supabaseAnonKey: v})} isSecret />
-              </div>
-            </AdminSection>
-
             <AdminSection title="Plaid Production API" icon="🏦">
                <div className="space-y-4">
                  <InputField label="Client ID" value={config.plaidClientId} onChange={v => setConfig({...config, plaidClientId: v})} />
-                 <InputField label="Secret Key" value={config.plaidSecret} onChange={v => setConfig({...config, plaidSecret: v})} isSecret />
                </div>
             </AdminSection>
 
             <AdminSection title="Stripe Settlement Node" icon="💳">
                <div className="space-y-4">
                  <InputField label="Publishable Key" value={config.stripePublicKey} onChange={v => setConfig({...config, stripePublicKey: v})} placeholder="pk_live_..." />
-                 <InputField label="Secret Key" value={config.stripeSecretKey} onChange={v => setConfig({...config, stripeSecretKey: v})} isSecret placeholder="sk_live_..." />
                </div>
             </AdminSection>
 

@@ -1,29 +1,10 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
-const getInitialConfig = () => {
-  const saved = localStorage.getItem('moneybuddy_config');
-  if (saved) {
-    try {
-      const config = JSON.parse(saved);
-      return {
-        url: config.supabaseUrl || 'https://your-project-url.supabase.co',
-        key: config.supabaseAnonKey || 'your-anon-key'
-      };
-    } catch (e) {
-      console.error("Config parse error", e);
-    }
-  }
-  return {
-    url: 'https://your-project-url.supabase.co',
-    key: 'your-anon-key'
-  };
-};
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const config = getInitialConfig();
-export let supabase = createClient(config.url, config.key);
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+}
 
-export const reinitializeSupabase = (url: string, key: string) => {
-  supabase = createClient(url, key);
-  return supabase;
-};
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');

@@ -4,10 +4,9 @@ import { supabase } from './supabaseClient';
 
 interface AuthProps {
   onDemoLogin: () => void;
-  onAdminLogin: (email: string) => void;
 }
 
-const Auth: React.FC<AuthProps> = ({ onDemoLogin, onAdminLogin }) => {
+const Auth: React.FC<AuthProps> = ({ onDemoLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,13 +17,6 @@ const Auth: React.FC<AuthProps> = ({ onDemoLogin, onAdminLogin }) => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
-
-    // Hardcoded Admin Logic
-    if (email === 'lucasnale305@gmail.com' && password === 'Awaken76!') {
-      onAdminLogin(email);
-      setLoading(false);
-      return;
-    }
 
     const { error } = isSignUp 
       ? await supabase.auth.signUp({ email, password })
