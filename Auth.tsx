@@ -45,19 +45,21 @@ const Auth: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="max-w-md w-full glass p-8 rounded-3xl space-y-8 shadow-2xl relative border border-white/10">
-        <div className="text-center">
-          <div className="w-24 h-24 mx-auto mb-4 relative">
-             <div className="absolute inset-0 bg-lime-400/20 blur-2xl rounded-full animate-pulse"></div>
-             <img 
-               src="logo.png" 
-               alt="Money Buddy Mascot" 
-               className="w-full h-full object-contain relative z-10 transform hover:scale-110 transition-transform duration-500"
-             />
+        <div className="text-center flex flex-col items-center gap-1">
+          <div className="w-32 h-32 relative mb-1">
+             <div className="absolute -inset-3 rounded-full opacity-60 animate-pulse" style={{ background: 'radial-gradient(circle, rgba(163,230,53,0.25) 0%, rgba(139,92,246,0.15) 50%, transparent 70%)' }}></div>
+             <div className="w-full h-full rounded-full overflow-hidden relative z-10 border-2 border-white/10 shadow-lg shadow-lime-400/10">
+               <img 
+                 src="logo.png" 
+                 alt="Money Buddy Mascot" 
+                 className="w-full h-full object-cover scale-110 transform hover:scale-125 transition-transform duration-500"
+               />
+             </div>
           </div>
-          <h2 className="text-3xl font-extrabold text-white tracking-tight">
+          <h2 className="text-3xl font-extrabold text-white tracking-tight leading-none">
             Money Buddy
           </h2>
-          <p className="mt-2 text-sm font-semibold uppercase tracking-widest" style={{ color: '#a3e635' }}>
+          <p className="text-sm font-bold uppercase tracking-[0.3em]" style={{ color: '#a3e635' }}>
             Geo-Safe
           </p>
         </div>
