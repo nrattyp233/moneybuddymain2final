@@ -67,7 +67,7 @@ const Auth: React.FC<AuthProps> = ({ onDemoLogin, onAdminLogin }) => {
              />
           </div>
           <h2 className="text-3xl font-extrabold text-white tracking-tight">
-            {isSignUp ? 'Initialize Profile' : 'Money Buddy'}
+            Money Buddy
           </h2>
           <p className="mt-2 text-indigo-300 text-sm font-medium uppercase tracking-widest">
             Geo-Safe
