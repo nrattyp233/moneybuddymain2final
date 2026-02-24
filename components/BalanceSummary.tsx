@@ -18,13 +18,9 @@ const BalanceSummary: React.FC<BalanceSummaryProps> = ({ accounts, isLoading }) 
           <span className="text-4xl md:text-5xl font-bold">
             {isLoading ? "..." : `$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           </span>
-          <span className="text-lime-400 text-sm font-semibold">+2.4% this month</span>
         </div>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-          <StatBox label="Active Cards" value="3" icon="💳" />
-          <StatBox label="Secured Zones" value="12" icon="📍" />
-          <StatBox label="Safe Score" value="98/100" icon="🛡️" />
           <StatBox label="Linked Banks" value={accounts.length.toString()} icon="🏛️" />
         </div>
       </div>
