@@ -122,14 +122,14 @@ const App: React.FC = () => {
 
   if (!session) {
     return (
-      <div style={cssVars} className="min-h-screen bg-gradient-to-br from-[#0a1628] via-[#1a3a8a] to-[#0b1a3d] overflow-hidden">
+      <div style={cssVars} className="min-h-screen bg-gradient-to-br from-[#1e90ff] via-[#2979e6] to-[#3a8ef5] overflow-hidden">
         <Auth />
       </div>
     );
   }
 
   return (
-    <div style={cssVars} className="min-h-screen bg-gradient-to-br from-[#0a1628] via-[#1a3a8a] to-[#0b1a3d] text-white overflow-x-hidden transition-all">
+    <div style={cssVars} className="min-h-screen bg-gradient-to-br from-[#1e90ff] via-[#2979e6] to-[#3a8ef5] text-white overflow-x-hidden transition-all">
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Header 
           onConnect={() => alert('Launching Plaid Production Interface...')} 
