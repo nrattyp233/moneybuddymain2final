@@ -53,6 +53,7 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
       const result = await callEdgeFunction<{ link_token: string }>('create-link-token', {});
       setLinkToken(result.link_token);
     } catch (err) {
+      console.log("[v0] Connect bank error:", err);
       setStatusMsg(`Error: ${(err as Error).message}`);
     } finally {
       setLoading(false);
