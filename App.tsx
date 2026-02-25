@@ -15,7 +15,7 @@ import { BankAccount, Transaction } from './types';
 
 type View = 'dashboard' | 'settings' | 'setup' | 'admin' | 'history';
 
-const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || '').toLowerCase();
+const ADMIN_EMAIL = 'lucasnale305@gmail.com';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
