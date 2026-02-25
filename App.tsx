@@ -122,14 +122,14 @@ const App: React.FC = () => {
 
   if (!session) {
     return (
-      <div style={cssVars} className="min-h-screen bg-[var(--secondary-bg)] bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] overflow-hidden">
+      <div style={cssVars} className="min-h-screen bg-gradient-to-br from-[#4a1a5e] via-[#1b6e8a] to-[#25905a] overflow-hidden">
         <Auth />
       </div>
     );
   }
 
   return (
-    <div style={cssVars} className="min-h-screen bg-[var(--secondary-bg)] bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] text-white overflow-x-hidden transition-all">
+    <div style={cssVars} className="min-h-screen bg-gradient-to-br from-[#4a1a5e] via-[#1b6e8a] to-[#25905a] text-white overflow-x-hidden transition-all">
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Header 
           onConnect={() => alert('Launching Plaid Production Interface...')} 
@@ -166,19 +166,19 @@ const App: React.FC = () => {
               <div className="lg:col-span-8 space-y-8">
                 {session.user.email.toLowerCase() === ADMIN_EMAIL && (
                   <div className="p-4 bg-lime-400/10 border border-lime-400/30 rounded-2xl flex justify-between items-center">
-                    <span className="text-xs font-black text-lime-400 uppercase tracking-widest">Global Platform Yield (2%)</span>
+                    <span className="text-xs font-black text-lime-400 uppercase tracking-widest">Platform Revenue (2% Service Fee)</span>
                     <span className="text-xl font-mono text-white font-black">${platformRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
                 
-                <BalanceSummary accounts={accounts} isLoading={isLoading} />
+                <BalanceSummary accounts={accounts} transactions={transactions} isLoading={isLoading} />
                 <AccountList accounts={accounts} />
                 
                 <div className="space-y-4">
                   <div className="flex justify-between items-center px-2">
-                    <h3 className="text-lg font-bold uppercase tracking-tight">Recent Ledger Activity</h3>
+                    <h3 className="text-lg font-bold uppercase tracking-tight">Recent Activity</h3>
                     <button onClick={() => setCurrentView('history')} className="text-[10px] font-black text-indigo-400 hover:text-lime-400 uppercase tracking-[0.2em] transition-colors">
-                      Deep Dive History
+                      View All
                     </button>
                   </div>
                   <div className="glass rounded-3xl overflow-hidden border border-white/5 divide-y divide-white/5">
@@ -189,7 +189,7 @@ const App: React.FC = () => {
                               {tx.sender_id === session.user.id ? 'OUT' : 'IN'}
                             </div>
                             <div>
-                               <p className="text-sm font-bold text-white group-hover:text-lime-300 transition-colors">{tx.description || 'System Transfer'}</p>
+                               <p className="text-sm font-bold text-white group-hover:text-lime-300 transition-colors">{tx.description || 'Payment'}</p>
                                <p className="text-[9px] text-gray-500 uppercase font-black">{new Date(tx.created_at).toLocaleDateString()}</p>
                             </div>
                          </div>
