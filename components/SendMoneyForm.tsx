@@ -1,14 +1,34 @@
 import React, { useState } from 'react';
+import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 import { supabase } from '../supabaseClient';
 import { callEdgeFunction } from '../lib/api';
-import { stripePromise } from '../lib/stripe';
 import MapSelector from './MapSelector';
+
+const CARD_ELEMENT_OPTIONS = {
+  style: {
+    base: {
+      color: '#ffffff',
+      fontFamily: '"Inter", system-ui, sans-serif',
+      fontSize: '14px',
+      fontWeight: '500',
+      '::placeholder': { color: 'rgba(255,255,255,0.3)' },
+      iconColor: '#bef264',
+    },
+    invalid: {
+      color: '#ef4444',
+      iconColor: '#ef4444',
+    },
+  },
+  hidePostalCode: false,
+};
 
 interface SendMoneyFormProps {
   onTransactionInitiated?: () => void;
 }
 
 const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated }) => {
+  const stripe = useStripe();
+  const elements = useElements();
   const [amount, setAmount] = useState('');
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
@@ -17,6 +37,7 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
   const [useExpiry, setUseExpiry] = useState(false);
   const [expiryHours, setExpiryHours] = useState('24');
   const [isLoading, setIsLoading] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,16 +96,20 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
         geofence_points: points,
       });
 
-      // 2. Confirm payment with Stripe.js
-      const stripe = await stripePromise;
-      if (!stripe) {
+      // 2. Confirm payment with real card via Stripe Elements
+      if (!stripe || !elements) {
         throw new Error('Stripe not loaded. Check VITE_STRIPE_PUBLISHABLE_KEY.');
+      }
+
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error('Card input not found. Please refresh and try again.');
       }
 
       const { error: stripeError } = await stripe.confirmCardPayment(paymentResult.client_secret, {
         payment_method: {
-          card: { token: 'tok_visa' }, // In production, use Stripe Elements for real card input
-        } as any,
+          card: cardElement,
+        },
       });
 
       if (stripeError) {
@@ -203,9 +228,22 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
           </div>
         </div>
 
+        <div className="group">
+          <label className="block text-[9px] font-black text-indigo-200 uppercase mb-1 ml-1 tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">Payment Card</label>
+          <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 hover:bg-white/10 transition-all focus-within:border-lime-400/50">
+            <CardElement 
+              options={CARD_ELEMENT_OPTIONS}
+              onChange={(e) => setCardError(e.error ? e.error.message : null)}
+            />
+          </div>
+          {cardError && (
+            <p className="text-[10px] text-red-400 font-bold mt-1.5 ml-1">{cardError}</p>
+          )}
+        </div>
+
         <button 
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || !stripe}
           className="w-full py-4 bg-lime-400 hover:bg-lime-300 text-indigo-900 font-black rounded-2xl transition-all active:scale-95 shadow-xl shadow-lime-400/20 uppercase text-[10px] tracking-[0.4em] disabled:opacity-50 mt-4 group"
         >
           {isLoading ? (
