@@ -1,10 +1,59 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { crypto } from 'https://deno.land/std/crypto/mod.ts';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': Deno.env.get('PLAID_ENV') === 'development' ? '*' : 'https://your-domain.com',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
 };
+
+// Verify Stripe webhook signature
+async function verifyStripeSignature(body: string, signature: string, secret: string): Promise<boolean> {
+  try {
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(secret);
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign', 'verify']
+    );
+
+    const signatureParts = signature.split(',');
+    let timestamp: string | null = null;
+    let signedPayload: string | null = null;
+
+    for (const part of signatureParts) {
+      const [key, value] = part.trim().split('=');
+      if (key === 't') {
+        timestamp = value;
+      } else if (key.startsWith('v1')) {
+        signedPayload = value;
+      }
+    }
+
+    if (!timestamp || !signedPayload) {
+      return false;
+    }
+
+    // Check timestamp is within 5 minutes
+    const now = Math.floor(Date.now() / 1000);
+    const eventTime = parseInt(timestamp);
+    if (now - eventTime > 300) {
+      return false;
+    }
+
+    const payload = `${timestamp}.${body}`;
+    const payloadData = encoder.encode(payload);
+    const signatureData = encoder.encode(signedPayload);
+
+    return await crypto.subtle.verify('HMAC', key, signatureData, payloadData);
+  } catch (error) {
+    console.error('Signature verification error:', error);
+    return false;
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -13,16 +62,36 @@ serve(async (req) => {
 
   try {
     const body = await req.text();
+    const signature = req.headers.get('stripe-signature');
+    const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
+
+    if (!signature || !webhookSecret) {
+      return new Response(JSON.stringify({ error: 'Missing signature or secret' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify the webhook signature
+    const isValid = await verifyStripeSignature(body, signature, webhookSecret);
+    if (!isValid) {
+      console.error('Invalid webhook signature');
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const event = JSON.parse(body);
 
-    // In production, verify the Stripe webhook signature:
-    // const sig = req.headers.get('stripe-signature');
-    // Use Stripe's webhook signature verification with STRIPE_WEBHOOK_SECRET
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase configuration');
+    }
 
-    const serviceSupabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
 
     switch (event.type) {
       case 'payment_intent.succeeded': {
