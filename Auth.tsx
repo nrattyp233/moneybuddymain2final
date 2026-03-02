@@ -54,11 +54,24 @@ const Auth: React.FC = () => {
                className="w-full h-full object-contain relative z-10 transform hover:scale-110 transition-transform duration-500"
              />
           </div>
-          <h2 className="text-3xl font-extrabold text-white tracking-tight leading-none">
-            Money Buddy
+          <h2 className="text-3xl font-extrabold tracking-tight leading-none relative">
+            <span className="text-white" style={{ 
+              WebkitTextStroke: '2px #A4E642', 
+              WebkitTextFillColor: 'white',
+              fill: 'white'
+            }}>
+              Money
+            </span>
+            <span className="text-white" style={{ 
+              WebkitTextStroke: '2px #FF7CA3', 
+              WebkitTextFillColor: 'white',
+              fill: 'white'
+            }}>
+              {' '}Buddy
+            </span>
           </h2>
           <p className="mt-1 text-sm font-bold uppercase tracking-[0.3em] text-white">
-            Secure Marketplace
+            New. Banking. Today.
           </p>
         </div>
 
