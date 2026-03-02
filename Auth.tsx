@@ -44,7 +44,7 @@ const Auth: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="max-w-md w-full glass p-8 rounded-3xl space-y-8 shadow-2xl relative border border-lime-400/20 bg-gradient-to-br from-lime-400/5 via-transparent to-transparent">
+      <div className="max-w-md w-full glass p-8 rounded-3xl space-y-8 shadow-2xl relative border border-[#FF7CA3]/20 bg-gradient-to-br from-lime-400/5 via-transparent to-transparent">
         <div className="text-center flex flex-col items-center gap-1">
           <div className="w-24 h-24 relative mb-2">
              <div className="absolute inset-0 bg-lime-400/20 blur-2xl rounded-full animate-pulse"></div>
@@ -71,7 +71,7 @@ const Auth: React.FC = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-lime-400/50 transition-colors text-sm"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-[#FF7CA3]/50 transition-colors text-sm"
                 placeholder="user@example.com"
               />
             </div>
@@ -82,7 +82,7 @@ const Auth: React.FC = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-lime-400/50 transition-colors text-sm"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-[#FF7CA3]/50 transition-colors text-sm"
                 placeholder="••••••••"
               />
             </div>
@@ -98,7 +98,7 @@ const Auth: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 bg-gradient-to-r from-[#FF7CA3] to-pink-500 hover:from-pink-500 hover:to-[#FF7CA3] text-white font-bold rounded-xl transition-all shadow-lg active:scale-[0.98] disabled:opacity-50 border border-[#FF7CA3]/30"
+              className="w-full py-4 bg-gradient-to-r from-lime-400 to-green-500 hover:from-green-500 hover:to-lime-400 text-white font-bold rounded-xl transition-all shadow-lg active:scale-[0.98] disabled:opacity-50 border border-lime-400/30"
             >
               {loading ? 'Signing in...' : (isSignUp ? 'SIGN UP' : 'LOG IN')}
             </button>
@@ -107,7 +107,7 @@ const Auth: React.FC = () => {
               <button
                 type="button"
                 onClick={handlePasswordReset}
-                className="w-full text-[10px] text-white hover:text-lime-400 transition-colors uppercase font-bold tracking-widest"
+                className="w-full text-[10px] text-[#FF7CA3] hover:text-white transition-colors uppercase font-bold tracking-widest"
               >
                 Forgot Password?
               </button>
@@ -118,7 +118,7 @@ const Auth: React.FC = () => {
         <div className="text-center pt-4">
           <button
             onClick={() => setIsSignUp(!isSignUp)}
-            className="text-white hover:text-lime-400 transition-colors text-xs font-bold uppercase tracking-widest"
+            className="text-[#FF7CA3] hover:text-white transition-colors text-xs font-bold uppercase tracking-widest"
           >
             {isSignUp ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
           </button>
