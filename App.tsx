@@ -30,7 +30,8 @@ const App: React.FC = () => {
   const [theme, setTheme] = useState({
     primary: '#4f46e5',
     secondary: '#0f0c29',
-    accent: '#bef264'
+    accent: '#bef264',
+    pinkAccent: '#FF7CA3'
   });
 
   // Fetch Logic
@@ -118,6 +119,7 @@ const App: React.FC = () => {
     '--primary-color': theme.primary,
     '--secondary-bg': theme.secondary,
     '--accent-color': theme.accent,
+    '--pink-accent': theme.pinkAccent,
   } as React.CSSProperties;
 
   if (!session) {
@@ -139,6 +141,12 @@ const App: React.FC = () => {
           currentView={currentView}
           setView={setCurrentView}
         />
+        
+        {/* Balanced Progress Bar */}
+        <div className="h-2 rounded-full mb-8 shadow-lg relative overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-[#FF7CA3] to-pink-500 shadow-[0_0_15px_rgba(255,124,163,0.5)]"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+        </div>
         
         <main className="mt-8 transition-all">
           {currentView === 'setup' && (
@@ -172,12 +180,12 @@ const App: React.FC = () => {
                 )}
                 
                 <BalanceSummary accounts={accounts} transactions={transactions} isLoading={isLoading} />
-                <AccountList accounts={accounts} />
+                <AccountList accounts={accounts} transactions={transactions} />
                 
                 <div className="space-y-4">
                   <div className="flex justify-between items-center px-2">
                     <h3 className="text-lg font-bold uppercase tracking-tight">Recent Activity</h3>
-                    <button onClick={() => setCurrentView('history')} className="text-[10px] font-black text-indigo-400 hover:text-lime-400 uppercase tracking-[0.2em] transition-colors">
+                    <button onClick={() => setCurrentView('history')} className="text-[10px] font-black text-indigo-400 hover:text-white uppercase tracking-[0.2em] transition-colors">
                       View All
                     </button>
                   </div>
@@ -185,7 +193,7 @@ const App: React.FC = () => {
                     {transactions.slice(0, 4).map(tx => (
                       <div key={tx.id} onClick={() => setCurrentView('history')} className="p-4 flex items-center justify-between hover:bg-white/5 transition-all cursor-pointer group">
                          <div className="flex items-center space-x-4">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black border ${tx.status === 'completed' ? 'bg-lime-400/10 border-lime-400/20 text-lime-400' : 'bg-indigo-400/10 border-indigo-400/20 text-indigo-400'}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black border ${tx.status === 'completed' ? 'bg-lime-400/10 border-lime-400/20 text-lime-400' : (tx.status === 'pending_payment' || tx.status === 'pending_escrow') ? 'bg-[#FF7CA3]/10 border-[#FF7CA3]/20 text-[#FF7CA3]' : 'bg-indigo-400/10 border-indigo-400/20 text-indigo-400'}`}>
                               {tx.sender_id === session.user.id ? 'OUT' : 'IN'}
                             </div>
                             <div>

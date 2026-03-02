@@ -12,7 +12,7 @@ const CARD_ELEMENT_OPTIONS = {
       fontSize: '14px',
       fontWeight: '500',
       '::placeholder': { color: 'rgba(255,255,255,0.3)' },
-      iconColor: '#bef264',
+      iconColor: '#FF7CA3',
     },
     invalid: {
       color: '#ef4444',
@@ -139,14 +139,16 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
   };
 
   return (
-    <div className="glass rounded-3xl p-6 sticky top-8 border border-white/5 shadow-2xl">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold flex items-center space-x-2">
-          <span className="w-2 h-6 bg-lime-400 rounded-full inline-block shadow-[0_0_10px_rgba(190,242,100,0.8)]"></span>
-          <span className="tracking-tight uppercase italic">New Payment</span>
-        </h3>
-        <span className="text-[8px] font-black text-lime-400/50 uppercase tracking-[0.2em] animate-pulse">Escrow</span>
-      </div>
+    <div className="glass rounded-3xl p-8 sticky top-8 border border-white/5 shadow-2xl bg-gradient-to-br from-lime-400/3 via-transparent to-transparent relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-24 h-24 bg-lime-400/10 rounded-full blur-2xl"></div>
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-8">
+          <h3 className="text-2xl font-black flex items-center space-x-3">
+            <span className="w-3 h-8 bg-[#FF7CA3] rounded-full inline-block shadow-[0_0_15px_rgba(255,124,163,0.6)] animate-pulse"></span>
+            <span className="tracking-tight uppercase italic text-white drop-shadow-lg">New Payment</span>
+          </h3>
+          <span className="text-[10px] font-black text-white uppercase tracking-[0.2em] animate-pulse border border-[#FF7CA3]/30 px-2 py-1 rounded-lg bg-[#FF7CA3]/10">Escrow</span>
+        </div>
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="group">
@@ -156,7 +158,7 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-lime-400/50 transition-all text-sm font-medium hover:bg-white/10"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-[#FF7CA3]/50 transition-all text-sm font-medium hover:bg-white/10 hover:bg-[#FF7CA3]/5"
             placeholder="seller@example.com"
           />
         </div>
@@ -170,7 +172,7 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
               required
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-3 focus:outline-none focus:border-lime-400/50 transition-all font-mono text-sm hover:bg-white/10"
+              className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-3 focus:outline-none focus:border-[#FF7CA3]/50 transition-all font-mono text-sm hover:bg-white/10 hover:bg-[#FF7CA3]/5"
               placeholder="0.00"
             />
           </div>
@@ -185,7 +187,7 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   </svg>
                 </div>
-                <span className={`text-[10px] font-black uppercase tracking-widest ${useGeofence ? 'text-indigo-200' : 'text-gray-500'}`}>Delivery Zone</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-white">Delivery Zone</span>
               </div>
               <input type="checkbox" checked={useGeofence} onChange={(e) => setUseGeofence(e.target.checked)} className="w-4 h-4 accent-lime-400 cursor-pointer" />
             </div>
@@ -204,7 +206,7 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <span className={`text-[10px] font-black uppercase tracking-widest ${useExpiry ? 'text-indigo-200' : 'text-gray-500'}`}>Fulfillment Deadline</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-white">Fulfillment Deadline</span>
               </div>
               <input type="checkbox" checked={useExpiry} onChange={(e) => setUseExpiry(e.target.checked)} className="w-4 h-4 accent-lime-400 cursor-pointer" />
             </div>
@@ -230,7 +232,7 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
 
         <div className="group">
           <label className="block text-[9px] font-black text-indigo-200 uppercase mb-1 ml-1 tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">Payment Card</label>
-          <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 hover:bg-white/10 transition-all focus-within:border-lime-400/50">
+          <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 hover:bg-white/10 hover:bg-[#FF7CA3]/5 transition-all focus-within:border-[#FF7CA3]/50">
             <CardElement 
               options={CARD_ELEMENT_OPTIONS}
               onChange={(e) => setCardError(e.error ? e.error.message : null)}
@@ -262,6 +264,7 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
            </div>
         </div>
       </form>
+      </div>
     </div>
   );
 };
