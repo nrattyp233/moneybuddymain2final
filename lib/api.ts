@@ -18,6 +18,14 @@ export async function callEdgeFunction<T = unknown>(
     throw new Error('No active session found. Please log in again.');
   }
 
+  // Refresh session to ensure JWT is valid
+  const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError || !refreshedSession?.access_token) {
+    throw new Error('Session expired. Please log in again.');
+  }
+
+  const currentSession = refreshedSession;
+
   // Get client IP and user agent for security tracking
   const clientIP = getClientIP();
   const userAgent = navigator.userAgent;
@@ -28,7 +36,7 @@ export async function callEdgeFunction<T = unknown>(
     await securityMonitor.createAlert({
       type: 'RATE_LIMIT_EXCEEDED' as any,
       severity: AlertSeverity.MEDIUM,
-      userId: session.user?.id,
+      userId: currentSession.user?.id,
       ipAddress: clientIP,
       userAgent,
       metadata: { functionName, limit: rateLimitResult.resetTime }
@@ -39,7 +47,7 @@ export async function callEdgeFunction<T = unknown>(
   // Validate session
   const bypassSessionValidation = functionName === 'create-link-token' || functionName === 'exchange-plaid-token';
   if (!bypassSessionValidation) {
-    const isSessionValid = await sessionManager.validateSession(session.access_token, clientIP, userAgent);
+    const isSessionValid = await sessionManager.validateSession(currentSession.access_token, clientIP, userAgent);
     if (!isSessionValid) {
       throw new Error('Session expired or invalid. Please log in again.');
     }
@@ -58,7 +66,7 @@ export async function callEdgeFunction<T = unknown>(
       await securityMonitor.createAlert({
         type: 'DATABASE_ANOMALY' as any,
         severity: AlertSeverity.MEDIUM,
-        userId: session.user?.id,
+        userId: currentSession.user?.id,
         ipAddress: clientIP,
         userAgent,
         metadata: { validationErrors: validation.errors, functionName }
@@ -68,8 +76,8 @@ export async function callEdgeFunction<T = unknown>(
     validatedBody = validation.sanitizedData;
 
     // Check for suspicious transaction patterns
-    if (session.user?.id) {
-      await securityMonitor.checkTransactionVolume(session.user.id);
+    if (currentSession.user?.id) {
+      await securityMonitor.checkTransactionVolume(currentSession.user.id);
     }
   }
 
@@ -78,7 +86,7 @@ export async function callEdgeFunction<T = unknown>(
     headers: {
       // Manually passing the Authorization header ensures the Edge Function 
       // can identify the user and create the Stripe Connect account.
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${currentSession.access_token}`,
     },
   });
 
@@ -87,7 +95,7 @@ export async function callEdgeFunction<T = unknown>(
     await securityMonitor.createAlert({
       type: 'DATABASE_ANOMALY' as any,
       severity: AlertSeverity.MEDIUM,
-      userId: session.user?.id,
+      userId: currentSession.user?.id,
       ipAddress: clientIP,
       userAgent,
       metadata: { 
@@ -105,6 +113,6 @@ export async function callEdgeFunction<T = unknown>(
 // Helper function to get client IP
 function getClientIP(): string {
   // In a real implementation, this would get the IP from the request
-  // For now, return a placeholder
-  return 'client-ip';
+  // For now, return a valid localhost IP for PostgreSQL inet type
+  return '127.0.0.1';
 }
