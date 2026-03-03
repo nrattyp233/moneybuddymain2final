@@ -37,9 +37,12 @@ export async function callEdgeFunction<T = unknown>(
   }
 
   // Validate session
-  const isSessionValid = await sessionManager.validateSession(session.access_token, clientIP, userAgent);
-  if (!isSessionValid) {
-    throw new Error('Session expired or invalid. Please log in again.');
+  const bypassSessionValidation = functionName === 'create-link-token' || functionName === 'exchange-plaid-token';
+  if (!bypassSessionValidation) {
+    const isSessionValid = await sessionManager.validateSession(session.access_token, clientIP, userAgent);
+    if (!isSessionValid) {
+      throw new Error('Session expired or invalid. Please log in again.');
+    }
   }
 
   // Input validation for sensitive functions

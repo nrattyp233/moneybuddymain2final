@@ -1,10 +1,21 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': Deno.env.get('PLAID_ENV') === 'development' ? '*' : 'https://your-domain.com',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') || '';
+  const allowed = (Deno.env.get('ALLOWED_ORIGINS') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const allowOrigin = allowed.length === 0 ? '*' : (allowed.includes(origin) ? origin : allowed[0]);
+
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+}
 
 const PLAID_BASE = Deno.env.get('PLAID_ENV') === 'development' ? 'https://sandbox.plaid.com' : 'https://production.plaid.com';
 const STRIPE_BASE = Deno.env.get('STRIPE_ENV') === 'development' ? 'https://api.stripe.com/v1' : 'https://api.stripe.com/v1';
@@ -60,6 +71,8 @@ async function stripeRequest(endpoint: string, body: string) {
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -120,7 +133,7 @@ serve(async (req) => {
       .from('profiles')
       .select('stripe_connect_account_id')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     let connectAccountId = profile?.stripe_connect_account_id;
 

@@ -97,10 +97,22 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
     setLoading(true);
     setStatusMsg(null);
     try {
+      console.log('Requesting Plaid link token...');
       const result = await callEdgeFunction<{ link_token: string }>('create-link-token', {});
+      console.log('Plaid link token received:', result ? 'success' : 'failed');
       setLinkToken(result.link_token);
     } catch (err) {
-      setStatusMsg(`Error: ${(err as Error).message}`);
+      console.error('Plaid link token error:', err);
+      const errorMessage = (err as Error).message;
+      
+      // Provide more user-friendly error messages
+      if (errorMessage.includes('Missing') || errorMessage.includes('PLAID_CLIENT_ID') || errorMessage.includes('PLAID_SECRET')) {
+        setStatusMsg('Plaid configuration error. Please contact support.');
+      } else if (errorMessage.includes('Unauthorized')) {
+        setStatusMsg('Authentication error. Please log in again.');
+      } else {
+        setStatusMsg(`Error: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -111,6 +123,8 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
     setLoading(true);
     setStatusMsg('Linking bank account...');
     try {
+      console.log('Exchanging Plaid token...', metadata);
+      
       const accountId = metadata.account_id || metadata.accounts?.[0]?.id;
       const result = await callEdgeFunction<{
         success: boolean;
@@ -121,6 +135,8 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
         public_token: publicToken,
         account_id: accountId,
       });
+
+      console.log('Plaid token exchange result:', result);
 
       setProfile(prev => prev ? { ...prev, stripe_connect_account_id: result.stripe_connect_account_id } : prev);
       setBankInfo({ name: result.bank_name, mask: result.bank_mask });
@@ -142,7 +158,19 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
       setStatusMsg('Bank account linked successfully');
       setLinkToken(null);
     } catch (err) {
-      setStatusMsg(`Error: ${(err as Error).message}`);
+      console.error('Plaid token exchange error:', err);
+      const errorMessage = (err as Error).message;
+      
+      // Provide more user-friendly error messages
+      if (errorMessage.includes('Missing') || errorMessage.includes('PLAID_CLIENT_ID') || errorMessage.includes('PLAID_SECRET')) {
+        setStatusMsg('Plaid configuration error. Please contact support.');
+      } else if (errorMessage.includes('Unauthorized')) {
+        setStatusMsg('Authentication error. Please log in again.');
+      } else if (errorMessage.includes('Plaid API error')) {
+        setStatusMsg('Bank connection failed. Please try again.');
+      } else {
+        setStatusMsg(`Error: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
