@@ -62,8 +62,8 @@ const App: React.FC = () => {
     if (session.user.email.toLowerCase() === ADMIN_EMAIL) {
       const { data: metrics } = await supabase.rpc('get_platform_revenue'); // Requires RPC or simple sum query
       // For simplicity in this build, we use the view or a sum query:
-      const { data: allTx } = await supabase.from('transactions').select('amount');
-      const totalRev = allTx?.reduce((sum, tx) => sum + (tx.amount * 0.02), 0) || 0;
+      const { data: allTx } = await supabase.from('transactions').select('protocol_fee');
+      const totalRev = allTx?.reduce((sum, tx) => sum + (tx.protocol_fee || 0), 0) || 0;
       setPlatformRevenue(totalRev);
     }
 
