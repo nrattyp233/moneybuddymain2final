@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://mbgs.vercel.app',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -32,10 +32,7 @@ serve(async (req) => {
       });
     }
 
-    const plaidEnv = Deno.env.get('PLAID_ENV') || 'sandbox';
-    const plaidUrl = plaidEnv === 'production' ? 'https://production.plaid.com' : 'https://sandbox.plaid.com';
-    
-    const plaidResponse = await fetch(`${plaidUrl}/link/token/create`, {
+    const plaidResponse = await fetch('https://production.plaid.com/link/token/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -43,10 +40,9 @@ serve(async (req) => {
         secret: Deno.env.get('PLAID_SECRET'),
         user: { client_user_id: user.id },
         client_name: 'Money Buddy',
-        products: ['auth', 'transactions'],
+        products: ['auth'],
         country_codes: ['US'],
         language: 'en',
-        webhook: `${Deno.env.get('SUPABASE_URL')}/functions/v1/plaid-webhook`,
       }),
     });
 
