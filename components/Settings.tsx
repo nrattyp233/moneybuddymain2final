@@ -119,29 +119,27 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
   };
 
   // Plaid Link success handler
-  const onPlaidSuccess = useCallback(async (publicToken: string, metadata: { account_id?: string; accounts?: Array<{ id: string }> }) => {
+  const onPlaidSuccess = useCallback(async (publicToken: string, metadata: { accounts?: Array<{ id: string }> }) => {
     setLoading(true);
-    setStatusMsg('Linking bank account...');
+    setStatusMsg('Linking bank accounts...');
     try {
       console.log('Exchanging Plaid token...', metadata);
       
-      const accountId = metadata.account_id || metadata.accounts?.[0]?.id;
+      const account_ids = metadata.accounts?.map(account => account.id) || [];
       const result = await callEdgeFunction<{
         success: boolean;
         stripe_connect_account_id: string;
-        bank_name: string;
-        bank_mask: string;
+        accounts: Array<{ account_id: string; name: string; mask: string; type: string }>;
       }>('exchange-plaid-token', {
         public_token: publicToken,
-        account_id: accountId,
+        account_ids: account_ids,
       });
 
       console.log('Plaid token exchange result:', result);
 
       setProfile(prev => prev ? { ...prev, stripe_connect_account_id: result.stripe_connect_account_id } : prev);
-      setBankInfo({ name: result.bank_name, mask: result.bank_mask });
       
-      // Refresh bank accounts list to include the new one
+      // Refresh bank accounts list to include the new ones
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: updatedBanks } = await supabase
@@ -152,10 +150,13 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
         
         if (updatedBanks) {
           setBankAccounts(updatedBanks);
+          if (updatedBanks.length > 0) {
+            setBankInfo({ name: updatedBanks[0].name, mask: updatedBanks[0].mask });
+          }
         }
       }
       
-      setStatusMsg('Bank account linked successfully');
+      setStatusMsg(`${result.accounts.length} bank account${result.accounts.length > 1 ? 's' : ''} linked successfully`);
       setLinkToken(null);
     } catch (err) {
       console.error('Plaid token exchange error:', err);
