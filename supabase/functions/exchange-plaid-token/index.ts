@@ -58,8 +58,20 @@ serve(async (req) => {
       });
     }
 
-    const { public_token, account_id } = await req.json();
-
+    const requestBody = await req.json();
+    let { public_token, account_ids, account_id } = requestBody;
+    
+    // Handle backward compatibility: if account_id is provided, use it as single account
+    if (account_id && !account_ids) {
+      account_ids = [account_id];
+    }
+    
+    if (!Array.isArray(account_ids) || account_ids.length === 0) {
+      return new Response(JSON.stringify({ error: 'Missing or invalid account_ids array' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     // 1. Exchange public token for access token
     const exchangeData = await plaidRequest('/item/public_token/exchange', { public_token });
     if (exchangeData.error_code) {
@@ -70,7 +82,6 @@ serve(async (req) => {
 
     // 2. Get account details
     const accountsData = await plaidRequest('/accounts/get', { access_token: accessToken });
-    const account = accountsData.accounts?.find((a: { account_id: string }) => a.account_id === account_id) || accountsData.accounts?.[0];
 
     // 3. Check if user already has a Stripe Connect account
     const { data: profile } = await supabase
@@ -80,6 +91,12 @@ serve(async (req) => {
       .maybeSingle();
 
     let connectAccountId = profile?.stripe_connect_account_id;
+
+    // Create service client
+    const serviceSupabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
 
     // 4. Create Stripe Connect Express account if needed
     if (!connectAccountId) {
@@ -95,54 +112,68 @@ serve(async (req) => {
         throw new Error(stripeAccount.error.message);
       }
       connectAccountId = stripeAccount.id;
+
+      // Immediately save to prevent race conditions
+      const { error: updateError } = await serviceSupabase.from('profiles').upsert({
+        id: user.id,
+        email: user.email,
+        stripe_connect_account_id: connectAccountId,
+      });
+
+      if (updateError) {
+        throw new Error('Failed to save Stripe account ID');
+      }
     }
 
-    // 5. Create Stripe bank account token via Plaid integration
-    const bankTokenData = await plaidRequest('/processor/stripe/bank_account_token/create', {
-      access_token: accessToken,
-      account_id: account_id || account?.account_id,
-    });
+    // 5. Process each selected account
+    const processedAccounts = [];
 
-    if (bankTokenData.error_code) {
-      throw new Error(bankTokenData.error_message);
+    for (const accountId of account_ids) {
+      const account = accountsData.accounts?.find((a: { account_id: string }) => a.account_id === accountId);
+      if (!account) continue;
+
+      // Create Stripe bank account token via Plaid integration
+      const bankTokenData = await plaidRequest('/processor/stripe/bank_account_token/create', {
+        access_token: accessToken,
+        account_id: accountId,
+      });
+
+      if (bankTokenData.error_code) {
+        throw new Error(bankTokenData.error_message);
+      }
+
+      // Attach bank account to Connect account
+      const attachParams = new URLSearchParams();
+      attachParams.append('external_account', bankTokenData.stripe_bank_account_token);
+
+      await stripeRequest(`/accounts/${connectAccountId}/external_accounts`, attachParams.toString());
+
+      // Save to database
+      await serviceSupabase.from('bank_accounts').upsert({
+        user_id: user.id,
+        name: account.name || account.official_name || 'Bank Account',
+        mask: account.mask || '****',
+        balance: account.balances?.current || 0,
+        type: account.subtype || 'checking',
+        institution_name: 'Linked via Plaid',
+        plaid_item_id: itemId,
+        plaid_account_id: accountId,
+        plaid_access_token: accessToken,
+        stripe_bank_account_token: bankTokenData.stripe_bank_account_token,
+      }, { onConflict: 'plaid_account_id' });
+
+      processedAccounts.push({
+        account_id: accountId,
+        name: account.name || account.official_name || 'Bank Account',
+        mask: account.mask || '****',
+        type: account.subtype || 'checking',
+      });
     }
-
-    // 6. Attach bank account to Connect account
-    const attachParams = new URLSearchParams();
-    attachParams.append('external_account', bankTokenData.stripe_bank_account_token);
-
-    await stripeRequest(`/accounts/${connectAccountId}/external_accounts`, attachParams.toString());
-
-    // 7. Save to database
-    const serviceSupabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
-    await serviceSupabase.from('profiles').upsert({
-      id: user.id,
-      email: user.email,
-      stripe_connect_account_id: connectAccountId,
-    });
-
-    await serviceSupabase.from('bank_accounts').upsert({
-      user_id: user.id,
-      name: account?.name || account?.official_name || 'Bank Account',
-      mask: account?.mask || '****',
-      balance: account?.balances?.current || 0,
-      type: account?.subtype || 'checking',
-      institution_name: 'Linked via Plaid',
-      plaid_item_id: itemId,
-      plaid_account_id: account_id || account?.account_id,
-      plaid_access_token: accessToken,
-      stripe_bank_account_token: bankTokenData.stripe_bank_account_token,
-    }, { onConflict: 'plaid_account_id' });
 
     return new Response(JSON.stringify({
       success: true,
       stripe_connect_account_id: connectAccountId,
-      bank_name: account?.name || 'Bank Account',
-      bank_mask: account?.mask || '****',
+      accounts: processedAccounts,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
