@@ -77,7 +77,7 @@ serve(async (req) => {
       .from('profiles')
       .select('stripe_connect_account_id')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     let connectAccountId = profile?.stripe_connect_account_id;
 
