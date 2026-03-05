@@ -119,13 +119,14 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
   };
 
   // Plaid Link success handler
-  const onPlaidSuccess = useCallback(async (publicToken: string, metadata: { accounts?: Array<{ id: string }> }) => {
+  const onPlaidSuccess = useCallback(async (publicToken: string, metadata: { account_id?: string; accounts?: Array<{ id: string }> }) => {
     setLoading(true);
     setStatusMsg('Linking bank accounts...');
     try {
       console.log('Exchanging Plaid token...', metadata);
       
-      const account_ids = metadata.accounts?.map(account => account.id) || [];
+      const account_ids = metadata.accounts ? metadata.accounts.map(account => account.id) : (metadata.account_id ? [metadata.account_id] : []);
+      console.log('Account IDs to send:', account_ids);
       const result = await callEdgeFunction<{
         success: boolean;
         stripe_connect_account_id: string;
