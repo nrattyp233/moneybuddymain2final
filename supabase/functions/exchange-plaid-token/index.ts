@@ -66,10 +66,22 @@ serve(async (req) => {
       // Handle backward compatibility: if account_id is provided, use it as single account
       if (account_id && !account_ids) {
         account_ids = [account_id];
-    const exchangeData = await plaidRequest('/item/public_token/exchange', { public_token });
-    if (exchangeData.error_code) {
-      throw new Error(exchangeData.error_message);
-    }
+      }
+      
+      console.log('Final account_ids:', account_ids);
+      
+      if (!Array.isArray(account_ids) || account_ids.length === 0) {
+        return new Response(JSON.stringify({ error: 'Missing or invalid account_ids array' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // 1. Exchange public token for access token
+      const exchangeData = await plaidRequest('/item/public_token/exchange', { public_token });
+      if (exchangeData.error_code) {
+        throw new Error(exchangeData.error_message);
+      }
     const accessToken = exchangeData.access_token;
     const itemId = exchangeData.item_id;
 
@@ -176,6 +188,7 @@ serve(async (req) => {
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+  }
   } catch (err) {
     return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500,
