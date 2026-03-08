@@ -7,12 +7,49 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+// In-memory rate limit store (resets on cold start)
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+function getClientIP(req: Request): string {
+  const forwarded = req.headers.get('x-forwarded-for');
+  const ip = forwarded ? forwarded.split(',')[0] : req.headers.get('x-real-ip') || 'unknown';
+  return ip;
+}
+
+function rateLimit(ip: string, maxRequests: number = 100, windowMs: number = 60 * 1000): boolean {
+  const now = Date.now();
+  const key = ip;
+  let record = rateLimitStore.get(key);
+
+  if (!record || now > record.resetTime) {
+    record = { count: 1, resetTime: now + windowMs };
+    rateLimitStore.set(key, record);
+    return true;
+  }
+
+  if (record.count >= maxRequests) {
+    return false;
+  }
+
+  record.count++;
+  return true;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    // Rate limiting: 100 requests per minute per IP
+    const clientIP = getClientIP(req);
+    if (!rateLimit(clientIP, 100, 60 * 1000)) {
+      return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const requestBody = await req.json();
     const { event_type, user_id, ip_address, user_agent, metadata, severity } = requestBody;
 
@@ -34,7 +71,7 @@ serve(async (req) => {
       .insert({
         event_type,
         user_id,
-        ip_address,
+        ip_address: ip_address || clientIP,
         user_agent,
         metadata,
         severity,
