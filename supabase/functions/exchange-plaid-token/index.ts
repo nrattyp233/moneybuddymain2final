@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 const corsHeaders = {
@@ -36,14 +36,13 @@ async function stripeRequest(endpoint: string, body: string) {
 }
 
 serve(async (req) => {
-  const trace: any[] = [];
-  const log = (msg: string, data?: any) => { trace.push({ msg, data, time: new Date().toISOString() }); console.log(msg, data); };
-
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    const requestBody = await req.json();
+    console.log("DATA_INBOUND:", requestBody);
     const authHeader = req.headers.get('Authorization')!;
     const token = authHeader.replace('Bearer ', '');
 
@@ -63,15 +62,12 @@ serve(async (req) => {
 
     try {
       const requestBody = await req.json();
-      log("DATA_INBOUND:", requestBody);
       let { public_token, account_ids, account_id } = requestBody;
       
       // Handle backward compatibility: if account_id is provided, use it as single account
       if (account_id && !account_ids) {
         account_ids = [account_id];
       }
-      
-      log('Final account_ids', account_ids);
       
       if (!Array.isArray(account_ids) || account_ids.length === 0) {
         return new Response(JSON.stringify({ error: 'Missing or invalid account_ids array' }), {
@@ -137,10 +133,8 @@ serve(async (req) => {
     const processedAccounts = [];
 
     for (const accountId of account_ids) {
-      log('Processing account', accountId);
       const account = accountsData.accounts?.find((a: { account_id: string }) => a.account_id === accountId);
       if (!account) {
-        log('Account not found, skipping', accountId);
         continue;
       }
 
@@ -161,19 +155,7 @@ serve(async (req) => {
       await stripeRequest(`/accounts/${connectAccountId}/external_accounts`, attachParams.toString());
 
       // Save to database
-      console.log("DB_INSERT_PAYLOAD:", {
-        user_id: user.id,
-        name: account.name || account.official_name || 'Bank Account',
-        mask: account.mask || '****',
-        balance: account.balances?.current || 0,
-        type: account.subtype || 'checking',
-        institution_name: 'Linked via Plaid',
-        plaid_item_id: itemId,
-        plaid_account_id: accountId,
-        plaid_access_token: accessToken,
-        stripe_bank_account_token: bankTokenData.stripe_bank_account_token,
-      });
-      const dbResult = await serviceSupabase.from('bank_accounts').upsert({
+      await serviceSupabase.from('bank_accounts').upsert({
         user_id: user.id,
         name: account.name || account.official_name || 'Bank Account',
         mask: account.mask || '****',
@@ -185,9 +167,6 @@ serve(async (req) => {
         plaid_access_token: accessToken,
         stripe_bank_account_token: bankTokenData.stripe_bank_account_token,
       }, { onConflict: 'plaid_account_id' });
-
-      log('DB_RESULT', dbResult);
-      log('Saved account', accountId);
 
       processedAccounts.push({
         account_id: accountId,
@@ -201,13 +180,12 @@ serve(async (req) => {
       success: true,
       stripe_connect_account_id: connectAccountId,
       accounts: processedAccounts,
-      debug_trace: trace,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-  } catch (err) {
-    return new Response(JSON.stringify({ error: (err as Error).message, debug_trace: trace }), {
+  catch (err) {
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

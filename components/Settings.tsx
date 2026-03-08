@@ -131,6 +131,7 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
         success: boolean;
         stripe_connect_account_id: string;
         accounts: Array<{ account_id: string; name: string; mask: string; type: string }>;
+        debug_trace: any[];
       }>('exchange-plaid-token', {
         public_token: publicToken,
         account_ids: account_ids,
