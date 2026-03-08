@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { crypto } from 'https://deno.land/std/crypto/mod.ts';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': Deno.env.get('PLAID_ENV') === 'development' ? '*' : 'https://your-domain.com',
+  'Access-Control-Allow-Origin': Deno.env.get('PLAID_ENV') === 'development' ? '*' : 'http://localhost:3000',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
 };
 
