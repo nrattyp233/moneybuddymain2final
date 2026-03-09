@@ -159,16 +159,17 @@ export function isIPAllowed(ip: string, allowedIPs: string[]): boolean {
 export async function logSecurityEvent(event: SecurityEvent): Promise<void> {
   try {
     // Check if session is valid, refresh if expired
-    let { data: { session }, error } = await supabase.auth.getSession();
-    if (error || !session || new Date(session.expires_at * 1000) < new Date()) {
-      // Attempt to refresh the session
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError || !refreshData.session) {
-        console.log('Session refresh failed, skipping security event logging');
-        return;
-      }
-      session = refreshData.session;
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) throw new Error('No session');
+
+    // Always refresh session to ensure JWT is valid
+    const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError || !refreshedSession?.access_token) {
+      throw new Error('Session refresh failed');
     }
+
+    const currentSession = refreshedSession;
 
     await supabase.functions.invoke('log-security-event', {
       body: {

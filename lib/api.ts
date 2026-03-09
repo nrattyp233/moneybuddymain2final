@@ -18,13 +18,15 @@ export async function callEdgeFunction<T = unknown>(
     throw new Error('No active session found. Please log in again.');
   }
 
-  // Refresh session to ensure JWT is valid
-  const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-  if (refreshError || !refreshedSession?.access_token) {
-    throw new Error('Session expired. Please log in again.');
+  // Check if session is expired, refresh if needed
+  let currentSession = session;
+  if (session.expires_at && session.expires_at < Date.now() / 1000) {
+    const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError || !refreshedSession?.access_token) {
+      throw new Error('Session expired. Please log in again.');
+    }
+    currentSession = refreshedSession;
   }
-
-  const currentSession = refreshedSession;
 
   // Get client IP and user agent for security tracking
   const clientIP = getClientIP();
