@@ -19,20 +19,30 @@ const Auth: React.FC = () => {
     setLoading(true);
     setMessage(null);
 
-    const { data, error } = isSignUp 
-      ? await supabase.auth.signUp({ email, password })
-      : await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message });
-      if (error.message.includes('Invalid URL') || error.message.includes('fetch')) {
-        setMessage({ type: 'error', text: 'Connection failed. Please try again later.' });
+    if (isSignUp) {
+      const { data, error } = await supabase.auth.signUp({ email, password })
+      if (error) {
+        setMessage({ type: 'error', text: error.message });
+        if (error.message.includes('Invalid URL') || error.message.includes('fetch')) {
+          setMessage({ type: 'error', text: 'Connection failed. Please try again later.' });
+        }
+      } else {
+        setMessage({ type: 'success', text: 'Confirmation link sent to your email.' });
       }
-    } else if (isSignUp) {
-      setMessage({ type: 'success', text: 'Confirmation link sent to your email.' });
     } else {
-      // Log session after login
-      console.log('Session after login:', data.session);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        console.error("Login error:", error.message)
+      } else {
+        console.log("Session after login:", data.session)
+        if (!data.session) {
+          console.error("Session is null after login. Something is wrong.")
+        }
+      }
     }
     setLoading(false);
   };
