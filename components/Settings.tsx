@@ -223,7 +223,12 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
   };
 
   const hasBankConnected = !!profile?.stripe_connect_account_id;
-  const isStripeOnboarded = !!profile?.stripe_connect_onboarded;
+  const handlePurgeLocalData = () => {
+    if (confirm('Are you sure you want to purge all local data? This will reset your setup and configuration.')) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-left-4 duration-500">
@@ -373,7 +378,7 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
                 <span className="w-2 h-2 rounded-full bg-lime-400 shadow-[0_0_8px_#bef264]"></span>
               </div>
               <div className="pt-4 mt-4 border-t border-white/5">
-                <button className="w-full py-3 glass hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 text-xs font-black uppercase tracking-widest transition-all rounded-xl">
+                <button onClick={handlePurgeLocalData} className="w-full py-3 glass hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 text-xs font-black uppercase tracking-widest transition-all rounded-xl">
                   Purge Local Storage
                 </button>
               </div>
