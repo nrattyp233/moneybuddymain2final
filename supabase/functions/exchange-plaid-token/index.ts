@@ -11,16 +11,33 @@ const PLAID_BASE = 'https://production.plaid.com';
 const STRIPE_BASE = 'https://api.stripe.com/v1';
 
 async function plaidRequest(endpoint: string, body: Record<string, unknown>) {
-  const res = await fetch(`${PLAID_BASE}${endpoint}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: Deno.env.get('PLAID_CLIENT_ID'),
-      secret: Deno.env.get('PLAID_SECRET'),
-      ...body,
-    }),
-  });
-  return res.json();
+  try {
+    console.log(`Making Plaid request to: ${endpoint}`);
+    console.log('Request body:', JSON.stringify(body, null, 2));
+    
+    const res = await fetch(`${PLAID_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: Deno.env.get('PLAID_CLIENT_ID'),
+        secret: Deno.env.get('PLAID_SECRET'),
+        ...body,
+      }),
+    });
+    
+    const responseText = await res.text();
+    console.log(`Plaid response status: ${res.status}`);
+    console.log(`Plaid response body: ${responseText}`);
+    
+    if (!res.ok) {
+      throw new Error(`Plaid API error: ${res.status} - ${responseText}`);
+    }
+    
+    return JSON.parse(responseText);
+  } catch (error) {
+    console.error('Plaid request failed:', error);
+    throw error;
+  }
 }
 
 async function stripeRequest(endpoint: string, body: string) {
