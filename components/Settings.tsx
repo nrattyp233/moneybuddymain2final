@@ -20,28 +20,32 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
   // Fetch user profile and bank info
   useEffect(() => {
     async function fetchProfile() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle(); // Use maybeSingle() to handle no profile case
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle(); // Use maybeSingle() to handle no profile case
 
-      if (data) {
-        setProfile(data as UserProfile);
-      }
+        if (data) {
+          setProfile(data as UserProfile);
+        }
 
-      const { data: banks } = await supabase
-        .from('bank_accounts')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        const { data: banks } = await supabase
+          .from('bank_accounts')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
 
-      if (banks && banks.length > 0) {
-        setBankAccounts(banks);
-        setBankInfo({ name: banks[0].name, mask: banks[0].mask });
+        if (banks && banks.length > 0) {
+          setBankAccounts(banks);
+          setBankInfo({ name: banks[0].name, mask: banks[0].mask });
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
       }
     }
     fetchProfile();
