@@ -11,16 +11,33 @@ const PLAID_BASE = 'https://production.plaid.com';
 const STRIPE_BASE = 'https://api.stripe.com/v1';
 
 async function plaidRequest(endpoint: string, body: Record<string, unknown>) {
-  const res = await fetch(`${PLAID_BASE}${endpoint}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: Deno.env.get('PLAID_CLIENT_ID'),
-      secret: Deno.env.get('PLAID_SECRET'),
-      ...body,
-    }),
-  });
-  return res.json();
+  try {
+    console.log(`Making Plaid request to: ${endpoint}`);
+    console.log('Request body:', JSON.stringify(body, null, 2));
+    
+    const res = await fetch(`${PLAID_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: Deno.env.get('PLAID_CLIENT_ID'),
+        secret: Deno.env.get('PLAID_SECRET'),
+        ...body,
+      }),
+    });
+    
+    const responseText = await res.text();
+    console.log(`Plaid response status: ${res.status}`);
+    console.log(`Plaid response body: ${responseText}`);
+    
+    if (!res.ok) {
+      throw new Error(`Plaid API error: ${res.status} - ${responseText}`);
+    }
+    
+    return JSON.parse(responseText);
+  } catch (error) {
+    console.error('Plaid request failed:', error);
+    throw error;
+  }
 }
 
 async function stripeRequest(endpoint: string, body: string) {
@@ -38,6 +55,25 @@ async function stripeRequest(endpoint: string, body: string) {
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  // Check required environment variables
+  const plaidClientId = Deno.env.get('PLAID_CLIENT_ID');
+  const plaidSecret = Deno.env.get('PLAID_SECRET');
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+
+  if (!plaidClientId || !plaidSecret || !supabaseUrl || !supabaseAnonKey || !supabaseServiceKey || !stripeSecretKey) {
+    console.error('Missing required environment variables');
+    return new Response(JSON.stringify({ 
+      error: 'Server configuration error', 
+      details: 'Missing required environment variables' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   try {
@@ -60,7 +96,17 @@ serve(async (req) => {
 
     try {
       const requestBody = await req.json();
+      console.log('Request body received:', JSON.stringify(requestBody, null, 2));
+      
       let { public_token, account_ids, account_id } = requestBody;
+      
+      if (!public_token) {
+        console.error('Missing public_token in request');
+        return new Response(JSON.stringify({ error: 'Missing public_token' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       
       // Handle backward compatibility: if account_id is provided, use it as single account
       if (account_id && !account_ids) {
@@ -75,15 +121,38 @@ serve(async (req) => {
       }
 
       // 1. Exchange public token for access token
+      console.log('Exchanging public token for access token');
       const exchangeData = await plaidRequest('/item/public_token/exchange', { public_token });
       if (exchangeData.error_code) {
-        throw new Error(exchangeData.error_message);
+        console.error('Plaid public token exchange failed:', exchangeData);
+        return new Response(JSON.stringify({ error: 'Plaid API Error', details: exchangeData.error_message || 'Failed to exchange public token' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
       const accessToken = exchangeData.access_token;
       const itemId = exchangeData.item_id;
+      console.log('Successfully exchanged token');
 
       // 2. Get account details
+      console.log('Fetching account details');
       const accountsData = await plaidRequest('/accounts/get', { access_token: accessToken });
+      
+      if (accountsData.error_code) {
+        console.error('Plaid accounts get failed:', accountsData);
+        return new Response(JSON.stringify({ error: 'Failed to get account details', details: accountsData.error_message || 'Plaid API error' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      if (!accountsData.accounts || accountsData.accounts.length === 0) {
+        console.error('No accounts returned from Plaid');
+        return new Response(JSON.stringify({ error: 'No accounts found' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       // 3. Check if user already has a Stripe Connect account
       const { data: profile } = await supabase

@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
 
 // Trigger redeploy with CORS fixes
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
@@ -12,6 +12,23 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  // Check required environment variables
+  const plaidClientId = Deno.env.get('PLAID_CLIENT_ID');
+  const plaidSecret = Deno.env.get('PLAID_SECRET');
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+
+  if (!plaidClientId || !plaidSecret || !supabaseUrl || !supabaseAnonKey) {
+    console.error('Missing required environment variables');
+    return new Response(JSON.stringify({ 
+      error: 'Server configuration error', 
+      details: 'Missing required environment variables' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   try {
