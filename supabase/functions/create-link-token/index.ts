@@ -21,10 +21,19 @@ serve(async (req) => {
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
   if (!plaidClientId || !plaidSecret || !supabaseUrl || !supabaseAnonKey) {
-    console.error('Missing required environment variables');
+    const missingVars = [];
+    if (!plaidClientId) missingVars.push('PLAID_CLIENT_ID');
+    if (!plaidSecret) missingVars.push('PLAID_SECRET');
+    if (!supabaseUrl) missingVars.push('SUPABASE_URL');
+    if (!supabaseAnonKey) missingVars.push('SUPABASE_ANON_KEY');
+
+    console.error('Missing required environment variables', { missingVars });
     return new Response(JSON.stringify({ 
       error: 'Server configuration error', 
-      details: 'Missing required environment variables' 
+      simple_explanation: 'The server is not fully configured.',
+      what_to_do: 'Ask the developer to set the missing environment variables in the Supabase Edge Function settings.',
+      missing_env_vars: missingVars,
+      location: 'supabase/functions/create-link-token/index.ts:18-23'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -34,7 +43,18 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing Authorization header' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ 
+        error: 'Missing Authorization header',
+        simple_explanation: 'The browser did not send your login token to the server.',
+        what_to_do: 'Make sure you are logged in, then try again. If this keeps happening, the frontend is not including the Authorization header.',
+        location: 'supabase/functions/create-link-token/index.ts:35-38',
+        debug: {
+          received_headers: Array.from(req.headers.keys()),
+        }
+      }), { 
+        status: 401, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
     const token = authHeader.replace('Bearer ', '');
 
@@ -46,7 +66,18 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      console.error('AUTH_ERROR_GET_USER', { authError, hasUser: !!user });
+      return new Response(JSON.stringify({ 
+        error: 'Unauthorized',
+        simple_explanation: 'Your login token was rejected by Supabase.',
+        what_to_do: 'Log out and log back in. If this still fails, the Supabase URL or anon key inside the Edge Function may not match the live project.',
+        location: 'supabase/functions/create-link-token/index.ts:46-52',
+        debug: {
+          auth_error: authError,
+          has_user: !!user,
+          supabase_url_env: supabaseUrl,
+        }
+      }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -75,11 +106,15 @@ serve(async (req) => {
     if (!plaidResponse.ok) {
       console.error("PLAID ERROR DETAILS:", JSON.stringify(plaidData));
       return new Response(JSON.stringify({ 
-        error_message: plaidData.error_message,
-        error_code: plaidData.error_code,
-        error_type: plaidData.error_type
+        error: 'Plaid API error',
+        simple_explanation: 'Plaid rejected the request to create a link token.',
+        what_to_do: 'Check that PLAID_CLIENT_ID and PLAID_SECRET are correct for the environment and that the Plaid dashboard is configured for this domain.',
+        location: 'supabase/functions/create-link-token/index.ts:55-71',
+        plaid_error_message: plaidData.error_message,
+        plaid_error_code: plaidData.error_code,
+        plaid_error_type: plaidData.error_type,
       }), {
-        status: 400,
+        status: plaidResponse.status || 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -89,7 +124,13 @@ serve(async (req) => {
     });
   } catch (err) {
     console.error("SERVER ERROR:", err);
-    return new Response(JSON.stringify({ error: (err as Error).message }), {
+    return new Response(JSON.stringify({ 
+      error: 'Unexpected server error',
+      simple_explanation: 'The server crashed while trying to create the Plaid link token.',
+      what_to_do: 'Check the Supabase Edge Function logs for the full stack trace.',
+      location: 'supabase/functions/create-link-token/index.ts:34-92',
+      debug_message: (err as Error).message,
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
