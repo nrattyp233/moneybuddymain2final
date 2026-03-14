@@ -63,6 +63,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY')!
     );
 
+    console.log("DEBUG_ENV_SUPABASE", {
+      supabaseUrl,
+      supabaseAnonKey: `${supabaseAnonKey.slice(0, 8)}…${supabaseAnonKey.slice(-6)}`,
+    });
+
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
