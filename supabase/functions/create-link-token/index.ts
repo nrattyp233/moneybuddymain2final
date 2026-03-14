@@ -54,10 +54,14 @@ serve(async (req) => {
 
     const plaidResponse = await fetch('https://production.plaid.com/link/token/create', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'PLAID-CLIENT-ID': plaidClientId,
+        'PLAID-SECRET': plaidSecret,
+      },
       body: JSON.stringify({
-        client_id: Deno.env.get('PLAID_CLIENT_ID'),
-        secret: Deno.env.get('PLAID_SECRET'),
+        client_id: plaidClientId,
+        secret: plaidSecret,
         user: { client_user_id: user.id },
         client_name: 'Money Buddy',
         products: ['auth'],
