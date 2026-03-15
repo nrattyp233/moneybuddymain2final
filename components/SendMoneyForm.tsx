@@ -38,18 +38,23 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
   const [expiryHours, setExpiryHours] = useState('24');
   const [isLoading, setIsLoading] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
     const val = parseFloat(amount);
-    if (isNaN(val) || val <= 0) return;
+    if (isNaN(val) || val <= 0) {
+      setSubmitError('Enter a valid amount greater than $0.');
+      return;
+    }
 
     setIsLoading(true);
 
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
-      alert("Terminal Session Expired. Re-authentication required.");
+      setSubmitError('Session expired. Please sign in again.');
       setIsLoading(false);
       return;
     }
@@ -98,7 +103,7 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
 
       // 2. Confirm payment with real card via Stripe Elements
       if (!stripe || !elements) {
-        throw new Error('Stripe not loaded. Check VITE_STRIPE_PUBLISHABLE_KEY.');
+        throw new Error('Payment form not ready. Refresh the page or check your Stripe key (VITE_STRIPE_PUBLISHABLE_KEY).');
       }
 
       const cardElement = elements.getElement(CardElement);
@@ -130,12 +135,15 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
       setUseGeofence(false);
       setUseExpiry(false);
       setExpiryHours('24');
+      setSubmitError(null);
       onTransactionInitiated?.();
     } catch (err) {
-      alert(`Payment Error: ${(err as Error).message}`);
+      const msg = (err as Error).message || 'Payment failed';
+      setSubmitError(msg);
+      alert(`Payment Error: ${msg}`);
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   return (
@@ -170,8 +178,10 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
             <input 
               type="number" 
               required
+              min="0.01"
+              step="0.01"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => { setAmount(e.target.value); setSubmitError(null); }}
               className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-3 focus:outline-none focus:border-[#FF7CA3]/50 transition-all font-mono text-sm hover:bg-white/10 hover:bg-[#FF7CA3]/5"
               placeholder="0.00"
             />
@@ -243,17 +253,23 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
           )}
         </div>
 
+        {submitError && (
+          <p className="text-[10px] font-bold text-red-400 bg-red-400/10 border border-red-400/30 rounded-xl px-3 py-2 mt-2">
+            {submitError}
+          </p>
+        )}
         <button 
           type="submit"
           disabled={isLoading || !stripe}
-          className="w-full py-4 bg-lime-400 hover:bg-lime-300 text-indigo-900 font-black rounded-2xl transition-all active:scale-95 shadow-xl shadow-lime-400/20 uppercase text-[10px] tracking-[0.4em] disabled:opacity-50 mt-4 group"
+          title={!stripe ? 'Loading payment form...' : undefined}
+          className="w-full py-4 bg-lime-400 hover:bg-lime-300 text-indigo-900 font-black rounded-2xl transition-all active:scale-95 shadow-xl shadow-lime-400/20 uppercase text-[10px] tracking-[0.4em] disabled:opacity-50 disabled:cursor-not-allowed mt-4 group"
         >
           {isLoading ? (
              <div className="flex items-center justify-center space-x-2">
                <div className="w-3 h-3 border-2 border-indigo-900 border-t-transparent rounded-full animate-spin"></div>
                <span>PROCESSING...</span>
              </div>
-          ) : 'SECURE PAYMENT'}
+          ) : !stripe ? 'LOADING PAYMENT FORM...' : 'SECURE PAYMENT'}
         </button>
 
         <div className="flex flex-col items-center space-y-1 opacity-40 mt-4">
