@@ -40,10 +40,11 @@ const App: React.FC = () => {
     if (!session) return;
     setIsLoading(true);
 
-    // 1. Fetch User Accounts
+    // 1. Fetch current user's bank accounts only
     const { data: accData } = await supabase
       .from('bank_accounts')
       .select('*')
+      .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
 
     // 2. Fetch User Transaction History (Sent and Received)
@@ -108,6 +109,13 @@ const App: React.FC = () => {
       }
     }
   }, [session, hasCompletedSetup, fetchData]);
+
+  // Refetch when user switches to dashboard so linked banks show up after Settings
+  useEffect(() => {
+    if (session && currentView === 'dashboard') {
+      fetchData();
+    }
+  }, [currentView, session, fetchData]);
 
   const handleTransactionInitiated = async () => {
     // Refresh history after a transfer is made
