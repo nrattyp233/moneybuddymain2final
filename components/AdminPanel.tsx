@@ -7,7 +7,7 @@ interface AdminPanelProps {
   onThemeChange: (theme: any) => void;
 }
 
-const ADMIN_EMAIL = 'lucasnale305@gmail.com';
+const ADMIN_EMAIL = 'dogpoundreject1@gmail.com';
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ currentTheme, onThemeChange }) => {
   const [isAdmin, setIsAdmin] = useState(false);
