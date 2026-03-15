@@ -8,7 +8,7 @@ interface BalanceSummaryProps {
 }
 
 const BalanceSummary: React.FC<BalanceSummaryProps> = ({ accounts, transactions, isLoading }) => {
-  const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+  const totalBalance = accounts.reduce((sum, acc) => sum + (Number(acc.balance) || 0), 0);
 
   // Compute real stats from transaction data
   const uniqueCards = new Set(transactions.map(tx => tx.sender_id)).size;

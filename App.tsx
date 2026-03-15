@@ -37,15 +37,18 @@ const App: React.FC = () => {
 
   // Fetch Logic
   const fetchData = useCallback(async () => {
-    if (!session) return;
+    if (!session?.user?.id) return;
     setIsLoading(true);
 
     // 1. Fetch current user's bank accounts only
-    const { data: accData } = await supabase
+    const { data: accData, error: accError } = await supabase
       .from('bank_accounts')
       .select('*')
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
+    if (accError) {
+      console.error('Failed to fetch bank accounts:', accError);
+    }
 
     // 2. Fetch User Transaction History (Sent and Received)
     const { data: txData } = await supabase
@@ -68,7 +71,7 @@ const App: React.FC = () => {
       setPlatformRevenue(totalRev);
     }
 
-    setAccounts(accData || []);
+    setAccounts(Array.isArray(accData) ? accData : []);
     setTransactions(txData || []);
     setInboundTransfers(inbound);
     setIsLoading(false);

@@ -61,7 +61,7 @@ const AccountList: React.FC<AccountListProps> = ({ accounts, transactions = [] }
                     </div>
                   </div>
                   <div className="mt-8 flex justify-between items-end">
-                    <span className="text-3xl font-black font-mono tracking-tighter text-white drop-shadow-2xl">${account.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <span className="text-3xl font-black font-mono tracking-tighter text-white drop-shadow-2xl">${(Number(account.balance) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     <div className={`w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center transition-all border border-white/10 ${scheme.icon}`}>
                       <svg className="w-6 h-6 text-gray-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
