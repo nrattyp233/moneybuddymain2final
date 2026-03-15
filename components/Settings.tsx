@@ -65,11 +65,11 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
-        .from('bank_accounts')
-        .delete()
-        .eq('id', accountId)
-        .eq('user_id', user.id);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(accountId);
+      const query = supabase.from('bank_accounts').delete().eq('user_id', user.id);
+      const { error } = isUuid
+        ? await query.eq('id', accountId)
+        : await query.eq('plaid_account_id', accountId);
 
       if (error) throw error;
 
@@ -164,35 +164,42 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
       console.log("SERVER_TRACE:", result.debug_trace);
 
       setProfile(prev => prev ? { ...prev, stripe_connect_account_id: result.stripe_connect_account_id } : prev);
-      
-      // Refresh bank accounts list to include the new ones
-      try {
-        console.log('Refreshing bank accounts...');
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: updatedBanks, error } = await supabase
-            .from('bank_accounts')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false });
-          
-          if (error) {
-            console.error('Error fetching updated banks:', error);
-            throw error;
-          }
 
-          console.log('Updated banks from DB:', updatedBanks);
-          if (updatedBanks) {
-            setBankAccounts(updatedBanks);
-            if (updatedBanks.length > 0) {
-              setBankInfo({ name: updatedBanks[0].name, mask: updatedBanks[0].mask });
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error refreshing bank accounts:', error);
+      // Show linked accounts immediately from API response (optimistic)
+      const optimisticBanks = (result.accounts || []).map((a: { account_id: string; name: string; mask: string; type: string }) => ({
+        id: a.account_id,
+        account_id: a.account_id,
+        name: a.name,
+        mask: a.mask || '****',
+        type: a.type || 'checking',
+        balance: 0,
+      }));
+      setBankAccounts(optimisticBanks);
+      if (optimisticBanks.length > 0) {
+        setBankInfo({ name: optimisticBanks[0].name, mask: optimisticBanks[0].mask });
       }
-      
+
+      // Refresh from DB to get real ids and balances (replace list when ready)
+      const refreshBanks = async () => {
+        const { data: { user: u } } = await supabase.auth.getUser();
+        if (!u) return;
+        const { data: updatedBanks, error } = await supabase
+          .from('bank_accounts')
+          .select('*')
+          .eq('user_id', u.id)
+          .order('created_at', { ascending: false });
+        if (error) {
+          console.error('Error refreshing bank accounts:', error);
+          setStatusMsg(`${result.accounts.length} bank account${result.accounts.length > 1 ? 's' : ''} linked. List may be out of date—refresh the page if needed.`);
+          return;
+        }
+        if (updatedBanks && updatedBanks.length > 0) {
+          setBankAccounts(updatedBanks);
+          setBankInfo({ name: updatedBanks[0].name, mask: updatedBanks[0].mask });
+        }
+      };
+      await refreshBanks();
+
       setStatusMsg(`${result.accounts.length} bank account${result.accounts.length > 1 ? 's' : ''} linked successfully`);
       setLinkToken(null);
     } catch (err) {
@@ -299,8 +306,8 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
                 
                 {bankAccounts.length > 0 ? (
                   <div className="space-y-2">
-                    {bankAccounts.map((account, index) => (
-                      <div key={account.id} className="flex items-center justify-between py-2 px-3 bg-white/5 rounded-lg border border-white/10">
+                    {bankAccounts.map((account) => (
+                      <div key={account.id ?? (account as any).account_id ?? account.name} className="flex items-center justify-between py-2 px-3 bg-white/5 rounded-lg border border-white/10">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-indigo-600/20 rounded-lg flex items-center justify-center">
                             <span className="text-indigo-400 text-xs font-bold">{account.type?.charAt(0).toUpperCase() || 'B'}</span>
