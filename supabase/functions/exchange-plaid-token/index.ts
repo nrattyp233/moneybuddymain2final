@@ -221,8 +221,8 @@ serve(async (req) => {
 
         await stripeRequest(`/accounts/${connectAccountId}/external_accounts`, attachParams.toString());
 
-        // Save to database
-        await serviceSupabase.from('bank_accounts').upsert({
+        // Save to database (insert so it works without UNIQUE on plaid_account_id; avoids disappearing on refresh)
+        const { error: insertErr } = await serviceSupabase.from('bank_accounts').insert({
           user_id: user.id,
           name: account.name || account.official_name || 'Bank Account',
           mask: account.mask || '****',
@@ -233,7 +233,11 @@ serve(async (req) => {
           plaid_account_id: accountId,
           plaid_access_token: accessToken,
           stripe_bank_account_token: bankTokenData.stripe_bank_account_token,
-        }, { onConflict: 'plaid_account_id' });
+        });
+        if (insertErr) {
+          console.error('bank_accounts insert error', insertErr);
+          throw new Error(insertErr.message);
+        }
 
         processedAccounts.push({
           account_id: accountId,
