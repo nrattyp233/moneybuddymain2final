@@ -221,19 +221,18 @@ serve(async (req) => {
 
         await stripeRequest(`/accounts/${connectAccountId}/external_accounts`, attachParams.toString());
 
-        // Save to database (insert so it works without UNIQUE on plaid_account_id; avoids disappearing on refresh)
-        const { error: insertErr } = await serviceSupabase.from('bank_accounts').insert({
+        // Save to database: only base columns so insert works even without stripe-connect migration
+        const row: Record<string, unknown> = {
           user_id: user.id,
           name: account.name || account.official_name || 'Bank Account',
           mask: account.mask || '****',
-          balance: account.balances?.current || 0,
+          balance: account.balances?.current ?? 0,
           type: account.subtype || 'checking',
           institution_name: 'Linked via Plaid',
           plaid_item_id: itemId,
           plaid_account_id: accountId,
-          plaid_access_token: accessToken,
-          stripe_bank_account_token: bankTokenData.stripe_bank_account_token,
-        });
+        };
+        const { error: insertErr } = await serviceSupabase.from('bank_accounts').insert(row);
         if (insertErr) {
           console.error('bank_accounts insert error', insertErr);
           throw new Error(insertErr.message);
