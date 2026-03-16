@@ -49,4 +49,14 @@ export interface UserProfile {
   display_name?: string;
   stripe_connect_account_id?: string;
   stripe_connect_onboarded: boolean;
+  stripe_customer_id?: string;
+}
+
+export interface PaymentMethod {
+  id: string;
+  type: 'card' | 'cashapp';
+  brand?: string;
+  last4?: string;
+  is_default: boolean;
+  stripe_payment_method_id?: string;
 }
