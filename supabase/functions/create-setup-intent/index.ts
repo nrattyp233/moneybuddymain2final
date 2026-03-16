@@ -35,13 +35,13 @@ serve(async (req) => {
     let customerId = profile?.stripe_customer_id;
 
     if (!customerId) {
+      const customerParams = new URLSearchParams();
+      customerParams.append('email', user.email || '');
+      customerParams.append('metadata[supabase_user_id]', user.id);
       const createRes = await fetch('https://api.stripe.com/v1/customers', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${stripeKey}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          email: user.email || '',
-          metadata: `supabase_user_id=${user.id}`,
-        }).toString(),
+        body: customerParams.toString(),
       });
       const customer = await createRes.json();
       if (customer.error) throw new Error(customer.error.message);
