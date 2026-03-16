@@ -49,8 +49,15 @@ export async function callEdgeFunction<T = unknown>(
     throw new Error('Too many requests. Please try again later.');
   }
 
-  // Validate session
-  const bypassSessionValidation = functionName === 'create-link-token' || functionName === 'exchange-plaid-token';
+  // Validate session (bypass extra validation for functions that only need the JWT; they still get the token and validate server-side)
+  const bypassSessionValidation = [
+    'create-link-token',
+    'exchange-plaid-token',
+    'create-setup-intent',
+    'attach-payment-method',
+    'list-payment-methods',
+    'delete-payment-method',
+  ].includes(functionName);
   if (!bypassSessionValidation) {
     const isSessionValid = await sessionManager.validateSession(currentSession.access_token, clientIP, userAgent);
     if (!isSessionValid) {
