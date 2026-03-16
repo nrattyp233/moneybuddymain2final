@@ -26,6 +26,7 @@ serve(async (req) => {
       });
     }
 
+    const body = await req.json();
     const {
       amount,
       recipient_email,
@@ -35,7 +36,8 @@ serve(async (req) => {
       geo_fence_radius,
       time_lock_until,
       geofence_points,
-    } = await req.json();
+      payment_method_id: savedPaymentMethodId,
+    } = body;
 
     if (!amount || amount <= 0) {
       return new Response(JSON.stringify({ error: 'Invalid amount' }), {
@@ -67,7 +69,12 @@ serve(async (req) => {
       .eq('email', recipient_email.toLowerCase())
       .single();
 
-    // Create Stripe PaymentIntent on the platform
+    const { data: senderProfile } = await serviceSupabase
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', user.id)
+      .single();
+
     const params = new URLSearchParams();
     params.append('amount', amountCents.toString());
     params.append('currency', 'usd');
@@ -78,6 +85,12 @@ serve(async (req) => {
 
     if (recipientProfile?.stripe_connect_account_id) {
       params.append('metadata[recipient_connect_account]', recipientProfile.stripe_connect_account_id);
+    }
+
+    if (savedPaymentMethodId && senderProfile?.stripe_customer_id) {
+      params.append('customer', senderProfile.stripe_customer_id);
+      params.append('payment_method', savedPaymentMethodId);
+      params.append('confirm', 'false');
     }
 
     const res = await fetch('https://api.stripe.com/v1/payment_intents', {

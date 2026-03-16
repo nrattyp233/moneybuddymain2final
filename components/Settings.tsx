@@ -1,21 +1,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
+import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 import { callEdgeFunction } from '../lib/api';
 import { supabase } from '../supabaseClient';
-import type { UserProfile } from '../types';
+import type { UserProfile, PaymentMethod } from '../types';
 
 interface SettingsProps {
   userEmail: string;
   isAdmin: boolean;
 }
 
+const CARD_OPTIONS = {
+  style: {
+    base: { color: '#fff', fontFamily: 'system-ui', fontSize: '14px', '::placeholder': { color: 'rgba(255,255,255,0.4)' } },
+    invalid: { color: '#ef4444' },
+  },
+};
+
 const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
+  const stripe = useStripe();
+  const elements = useElements();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [bankInfo, setBankInfo] = useState<{ name: string; mask: string } | null>(null);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [showAddCard, setShowAddCard] = useState(false);
+  const [addingCard, setAddingCard] = useState(false);
 
   // Fetch user profile and bank info
   useEffect(() => {
@@ -44,13 +57,63 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
           setBankAccounts(banks);
           setBankInfo({ name: banks[0].name, mask: banks[0].mask });
         }
+
+        const listRes = await callEdgeFunction<{ payment_methods: PaymentMethod[] }>('list-payment-methods', {});
+        if (listRes?.payment_methods) setPaymentMethods(listRes.payment_methods);
       } catch (error) {
         console.error('Error fetching profile:', error);
       }
     }
 
     fetchProfile();
-  }, [userEmail]); // Add dependency to prevent infinite re-renders
+  }, [userEmail]);
+
+  const fetchPaymentMethods = useCallback(async () => {
+    try {
+      const res = await callEdgeFunction<{ payment_methods: PaymentMethod[] }>('list-payment-methods', {});
+      if (res?.payment_methods) setPaymentMethods(res.payment_methods);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const handleAddCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    const cardEl = elements.getElement(CardElement);
+    if (!cardEl) return;
+    setAddingCard(true);
+    setStatusMsg(null);
+    try {
+      const { client_secret } = await callEdgeFunction<{ client_secret: string }>('create-setup-intent', {});
+      const { setupIntent, error: confirmErr } = await stripe.confirmCardSetup(client_secret, { payment_method: { card: cardEl } });
+      if (confirmErr) throw new Error(confirmErr.message);
+      if (setupIntent?.payment_method) {
+        await callEdgeFunction('attach-payment-method', { payment_method_id: setupIntent.payment_method });
+        await fetchPaymentMethods();
+        setShowAddCard(false);
+        setStatusMsg('Card added successfully.');
+      }
+    } catch (err) {
+      setStatusMsg(`Error: ${(err as Error).message}`);
+    } finally {
+      setAddingCard(false);
+    }
+  };
+
+  const handleRemovePaymentMethod = async (id: string) => {
+    if (!confirm('Remove this card from your payment methods?')) return;
+    setLoading(true);
+    try {
+      await callEdgeFunction('delete-payment-method', { id });
+      await fetchPaymentMethods();
+      setStatusMsg('Payment method removed.');
+    } catch (err) {
+      setStatusMsg(`Error: ${(err as Error).message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Function to remove bank account
   const handleRemoveBank = async (accountId: string) => {
@@ -375,6 +438,68 @@ const Settings: React.FC<SettingsProps> = ({ userEmail, isAdmin }) => {
                   <span className="text-xs font-mono text-gray-500">{profile.stripe_connect_account_id}</span>
                 </div>
               )}
+
+              {/* Payment methods: cards + Cash App placeholder */}
+              <div className="py-2 border-b border-white/5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm text-gray-400 font-bold uppercase tracking-widest">Payment methods</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCard(!showAddCard)}
+                    disabled={loading || !stripe}
+                    className="px-3 py-1 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-500/30 transition-all disabled:opacity-50"
+                  >
+                    {showAddCard ? 'Cancel' : '+ Add card'}
+                  </button>
+                </div>
+                {showAddCard && (
+                  <form onSubmit={handleAddCard} className="mb-4 p-4 bg-white/5 rounded-xl border border-white/10 space-y-3">
+                    <div className="rounded-lg border border-white/10 px-3 py-2.5 bg-black/20">
+                      <CardElement options={CARD_OPTIONS} />
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="submit" disabled={addingCard || !stripe} className="px-4 py-2 bg-lime-500/20 text-lime-400 rounded-lg text-[10px] font-black uppercase disabled:opacity-50">
+                        {addingCard ? 'Saving...' : 'Save card'}
+                      </button>
+                      <button type="button" onClick={() => setShowAddCard(false)} className="px-4 py-2 bg-white/10 text-gray-400 rounded-lg text-[10px] font-black uppercase">
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+                {paymentMethods.length > 0 ? (
+                  <div className="space-y-2">
+                    {paymentMethods.map((pm) => (
+                      <div key={pm.id} className="flex items-center justify-between py-2 px-3 bg-white/5 rounded-lg border border-white/10">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">💳</span>
+                          <div>
+                            <span className="text-sm text-white font-medium capitalize">{pm.brand || 'Card'}</span>
+                            <span className="text-xs text-gray-400 ml-1">****{pm.last4}</span>
+                            {pm.is_default && <span className="ml-2 text-[9px] text-lime-400 uppercase font-black">Default</span>}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePaymentMethod(pm.id)}
+                          disabled={loading}
+                          className="w-6 h-6 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 flex items-center justify-center disabled:opacity-50"
+                          title="Remove card"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : !showAddCard && (
+                  <div className="text-center py-3 text-gray-500 text-xs">No cards saved. Add a card to use it at checkout.</div>
+                )}
+                <div className="mt-3 flex items-center gap-2 py-2 px-3 bg-white/5 rounded-lg border border-dashed border-white/10 opacity-70">
+                  <span className="text-lg">📱</span>
+                  <span className="text-xs text-gray-400">Cash App</span>
+                  <span className="text-[9px] text-indigo-400 uppercase font-black">Coming soon</span>
+                </div>
+              </div>
             </div>
           </Section>
 

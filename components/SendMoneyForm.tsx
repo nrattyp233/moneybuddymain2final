@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 import { supabase } from '../supabaseClient';
 import { callEdgeFunction } from '../lib/api';
 import MapSelector from './MapSelector';
+import type { PaymentMethod } from '../types';
 
 const CARD_ELEMENT_OPTIONS = {
   style: {
@@ -39,6 +40,14 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
   const [isLoading, setIsLoading] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [payWith, setPayWith] = useState<'new' | string>('new'); // 'new' | stripe_payment_method_id (saved) | 'cashapp'
+
+  useEffect(() => {
+    callEdgeFunction<{ payment_methods: PaymentMethod[] }>('list-payment-methods', {})
+      .then((res) => res?.payment_methods && setPaymentMethods(res.payment_methods))
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,7 +92,13 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
         ? new Date(Date.now() + parseInt(expiryHours) * 60 * 60 * 1000).toISOString()
         : null;
 
-      // 1. Create PaymentIntent via Edge Function
+      const savedPmId = payWith && payWith !== 'new' && payWith !== 'cashapp' ? payWith : undefined;
+      if (payWith === 'cashapp') {
+        setSubmitError('Cash App pay is coming soon. Use a card for now.');
+        setIsLoading(false);
+        return;
+      }
+
       const paymentResult = await callEdgeFunction<{
         client_secret: string;
         transaction_id: string;
@@ -99,23 +114,23 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
         geo_fence_radius: geoFenceRadius,
         time_lock_until: timeLockUntil,
         geofence_points: points,
+        payment_method_id: savedPmId || undefined,
       });
 
-      // 2. Confirm payment with real card via Stripe Elements
-      if (!stripe || !elements) {
-        throw new Error('Payment form not ready. Refresh the page or check your Stripe key (VITE_STRIPE_PUBLISHABLE_KEY).');
+      if (!stripe) {
+        throw new Error('Payment form not ready. Refresh the page or check your Stripe key.');
       }
 
-      const cardElement = elements.getElement(CardElement);
-      if (!cardElement) {
-        throw new Error('Card input not found. Please refresh and try again.');
+      let stripeError;
+      if (savedPmId) {
+        stripeError = (await stripe.confirmCardPayment(paymentResult.client_secret)).error;
+      } else {
+        const cardElement = elements?.getElement(CardElement);
+        if (!cardElement) throw new Error('Card input not found. Please refresh and try again.');
+        stripeError = (await stripe.confirmCardPayment(paymentResult.client_secret, {
+          payment_method: { card: cardElement },
+        })).error;
       }
-
-      const { error: stripeError } = await stripe.confirmCardPayment(paymentResult.client_secret, {
-        payment_method: {
-          card: cardElement,
-        },
-      });
 
       if (stripeError) {
         throw new Error(stripeError.message || 'Payment failed');
@@ -241,16 +256,37 @@ const SendMoneyForm: React.FC<SendMoneyFormProps> = ({ onTransactionInitiated })
         </div>
 
         <div className="group">
-          <label className="block text-[9px] font-black text-indigo-200 uppercase mb-1 ml-1 tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">Payment Card</label>
-          <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 hover:bg-white/10 hover:bg-[#FF7CA3]/5 transition-all focus-within:border-[#FF7CA3]/50">
-            <CardElement 
-              options={CARD_ELEMENT_OPTIONS}
-              onChange={(e) => setCardError(e.error ? e.error.message : null)}
-            />
+          <label className="block text-[9px] font-black text-indigo-200 uppercase mb-1 ml-1 tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">How to pay</label>
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-all ${payWith === 'new' ? 'bg-lime-400/20 border-lime-400/40 text-lime-300' : 'bg-white/5 border-white/10 hover:border-white/20'}`}>
+                <input type="radio" name="payWith" value="new" checked={payWith === 'new'} onChange={() => setPayWith('new')} className="sr-only" />
+                <span className="text-lg">💳</span>
+                <span className="text-[10px] font-black uppercase">New card</span>
+              </label>
+              {paymentMethods.filter((pm) => pm.stripe_payment_method_id).map((pm) => (
+                <label key={pm.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-all ${payWith === pm.stripe_payment_method_id ? 'bg-lime-400/20 border-lime-400/40 text-lime-300' : 'bg-white/5 border-white/10 hover:border-white/20'}`}>
+                  <input type="radio" name="payWith" value={pm.stripe_payment_method_id!} checked={payWith === pm.stripe_payment_method_id} onChange={() => setPayWith(pm.stripe_payment_method_id!)} className="sr-only" />
+                  <span className="text-lg">💳</span>
+                  <span className="text-[10px] font-black uppercase">{pm.brand || 'Card'} ****{pm.last4}</span>
+                </label>
+              ))}
+              <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed opacity-60 cursor-not-allowed ${payWith === 'cashapp' ? 'bg-indigo-500/10' : 'bg-white/5 border-white/10'}`}>
+                <input type="radio" name="payWith" value="cashapp" checked={payWith === 'cashapp'} onChange={() => setPayWith('cashapp')} className="sr-only" />
+                <span className="text-lg">📱</span>
+                <span className="text-[10px] font-black uppercase">Cash App</span>
+                <span className="text-[8px] text-indigo-400">Soon</span>
+              </label>
+            </div>
+            {payWith === 'new' && (
+              <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 hover:bg-white/10 focus-within:border-[#FF7CA3]/50">
+                <CardElement options={CARD_ELEMENT_OPTIONS} onChange={(e) => setCardError(e.error ? e.error.message : null)} />
+              </div>
+            )}
+            {payWith === 'new' && cardError && (
+              <p className="text-[10px] text-red-400 font-bold ml-1">{cardError}</p>
+            )}
           </div>
-          {cardError && (
-            <p className="text-[10px] text-red-400 font-bold mt-1.5 ml-1">{cardError}</p>
-          )}
         </div>
 
         {submitError && (
