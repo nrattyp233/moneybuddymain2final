@@ -93,14 +93,48 @@ export async function callEdgeFunction<T = unknown>(
     }
   }
 
-  const { data, error } = await supabase.functions.invoke(functionName, {
-    body: validatedBody,
-    headers: {
-      // Manually passing the Authorization header ensures the Edge Function 
-      // can identify the user and create the Stripe Connect account.
-      Authorization: `Bearer ${currentSession.access_token}`,
-    },
-  });
+  const paymentMethodFunctions = [
+    'create-setup-intent',
+    'attach-payment-method',
+    'list-payment-methods',
+    'delete-payment-method',
+  ];
+  const useDirectFetch = paymentMethodFunctions.includes(functionName);
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+  let data: unknown;
+  let error: { message: string; code?: string } | null = null;
+
+  if (useDirectFetch && supabaseUrl && anonKey) {
+    try {
+      const res = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentSession.access_token}`,
+          'apikey': anonKey,
+        },
+        body: JSON.stringify(validatedBody),
+      });
+      data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        error = { message: (data as { error?: string })?.error || res.statusText, code: String(res.status) };
+      }
+    } catch (e) {
+      error = { message: (e as Error).message };
+      data = null;
+    }
+  } else {
+    const result = await supabase.functions.invoke(functionName, {
+      body: validatedBody,
+      headers: {
+        Authorization: `Bearer ${currentSession.access_token}`,
+      },
+    });
+    data = result.data;
+    error = result.error;
+  }
 
   if (error) {
     // Log API errors for monitoring
